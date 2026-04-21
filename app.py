@@ -120,13 +120,16 @@ def run_script(cmd):
     try:
         result = subprocess.run(
             [sys.executable] + cmd,
-            capture_output=True, text=True, timeout=30
+            capture_output=True, text=True, timeout=60
         )
-        return json.loads(result.stdout) if result.stdout.strip() else {"error": result.stderr}
+        if result.stdout.strip():
+            return json.loads(result.stdout)
+        else:
+            return {"error": result.stderr.strip() or "Script produced no output", "returncode": result.returncode}
     except subprocess.TimeoutExpired:
-        return {"error": "Script timed out after 30 seconds"}
-    except json.JSONDecodeError:
-        return {"error": "Could not parse script output"}
+        return {"error": "Script timed out after 60 seconds"}
+    except json.JSONDecodeError as e:
+        return {"error": f"Could not parse script output: {e}", "raw": result.stdout[:500]}
     except Exception as e:
         return {"error": str(e)}
 
@@ -208,6 +211,13 @@ def chat():
             break
 
     return jsonify({"response": "I ran into an issue processing your request. Please try again."})
+
+
+@app.route("/test")
+def test_search():
+    """Diagnostic: run search_enclosures with fixed dims and return raw result."""
+    result = run_script([SEARCH_PY, "300", "250", "150"])
+    return jsonify(result)
 
 
 if __name__ == "__main__":
