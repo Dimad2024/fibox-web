@@ -6,7 +6,6 @@ Usage: python3 search_enclosures.py <W_mm> <D_mm> <H_mm>
 import sys, json, re, os
 import openpyxl
 
-# Resolve data file path relative to this script — works locally and on Railway
 _THIS_FILE   = os.path.abspath(__file__)
 _SCRIPTS_DIR = os.path.dirname(_THIS_FILE)
 _APP_DIR     = os.path.dirname(_SCRIPTS_DIR)
@@ -22,6 +21,9 @@ COL_DIM    = 6
 COL_WEIGHT = 7
 COL_URL    = 10
 DATA_START = 3
+
+GROUP_PRIORITY = {'MNX': 1, 'EURONORD': 2, 'TEMPO': 3, 'ARCA': 4, 'MCE': 99}
+DEFAULT_PRIORITY = 5
 
 
 def parse_dim(dim_str):
@@ -72,6 +74,9 @@ def main():
         if (within_tolerance(W, req[0], TOLERANCE) and
             within_tolerance(D, req[1], TOLERANCE) and
             within_tolerance(H, req[2], TOLERANCE)):
+            grp = str(row[COL_GROUP] or '').strip().upper()
+            tier = GROUP_PRIORITY.get(grp, DEFAULT_PRIORITY)
+            vd = round(volume_diff(dims, req), 4)
             results.append({
                 'group'      : row[COL_GROUP],
                 'code'       : row[COL_CODE],
@@ -84,10 +89,14 @@ def main():
                 'pack_unit'  : row[COL_PACK],
                 'weight_kg'  : row[COL_WEIGHT],
                 'weblink'    : str(row[COL_URL] or ''),
-                'vol_diff'   : round(volume_diff(dims, req), 4),
+                'vol_diff'   : vd,
+                'sort_key'   : [tier, vd],
             })
 
-    results.sort(key=lambda x: x['vol_diff'])
+    results.sort(key=lambda x: x['sort_key'])
+    for r in results:
+        del r['sort_key']
+
     wb.close()
     print(json.dumps({
         'requested': {'W': req[0], 'D': req[1], 'H': req[2]},
