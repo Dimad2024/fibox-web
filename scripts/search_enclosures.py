@@ -22,9 +22,6 @@ COL_WEIGHT = 7
 COL_URL    = 10
 DATA_START = 3
 
-GROUP_PRIORITY = {'MNX': 1, 'EURONORD': 2, 'TEMPO': 3, 'ARCA': 4, 'MCE': 99}
-DEFAULT_PRIORITY = 5
-
 
 def parse_dim(dim_str):
     if not dim_str:
@@ -75,8 +72,9 @@ def main():
             within_tolerance(D, req[1], TOLERANCE) and
             within_tolerance(H, req[2], TOLERANCE)):
             grp = str(row[COL_GROUP] or '').strip().upper()
-            tier = GROUP_PRIORITY.get(grp, DEFAULT_PRIORITY)
             vd = round(volume_diff(dims, req), 4)
+            # MCE always last; all other families sort by volume proximity
+            mce_last = 1 if grp == 'MCE' else 0
             results.append({
                 'group'      : row[COL_GROUP],
                 'code'       : row[COL_CODE],
@@ -90,12 +88,12 @@ def main():
                 'weight_kg'  : row[COL_WEIGHT],
                 'weblink'    : str(row[COL_URL] or ''),
                 'vol_diff'   : vd,
-                'sort_key'   : [tier, vd],
+                '_sort'      : (mce_last, vd),
             })
 
-    results.sort(key=lambda x: x['sort_key'])
+    results.sort(key=lambda x: x['_sort'])
     for r in results:
-        del r['sort_key']
+        del r['_sort']
 
     wb.close()
     print(json.dumps({
