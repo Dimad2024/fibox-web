@@ -11,16 +11,17 @@ _SCRIPTS_DIR = os.path.dirname(_THIS_FILE)
 _APP_DIR     = os.path.dirname(_SCRIPTS_DIR)
 DATA_FILE    = os.path.join(_APP_DIR, 'master_web.xlsx')
 
-TOLERANCE  = 0.20
-COL_GROUP  = 0
-COL_CODE   = 2
-COL_SYMBOL = 3
-COL_DESC   = 4
-COL_PACK   = 5
-COL_DIM    = 6
-COL_WEIGHT = 7
-COL_URL    = 10
-DATA_START = 3
+TOLERANCE    = 0.20
+EXACT_THRESH = 0.02   # within 2% counts as an exact dimension match
+COL_GROUP    = 0
+COL_CODE     = 2
+COL_SYMBOL   = 3
+COL_DESC     = 4
+COL_PACK     = 5
+COL_DIM      = 6
+COL_WEIGHT   = 7
+COL_URL      = 10
+DATA_START   = 3
 
 
 def parse_dim(dim_str):
@@ -43,6 +44,14 @@ def volume_diff(dims, target_dims):
     vol   = dims[0] * dims[1] * dims[2]
     vol_t = target_dims[0] * target_dims[1] * target_dims[2]
     return abs(vol - vol_t) / max(vol_t, 1)
+
+
+def exact_dim_count(dims, target, thresh=EXACT_THRESH):
+    """Count how many individual dimensions are within thresh% of target."""
+    return sum(
+        1 for v, t in zip(dims, target)
+        if abs(v - t) / max(t, 1) <= thresh
+    )
 
 
 def main():
@@ -71,10 +80,10 @@ def main():
         if (within_tolerance(W, req[0], TOLERANCE) and
             within_tolerance(D, req[1], TOLERANCE) and
             within_tolerance(H, req[2], TOLERANCE)):
-            grp = str(row[COL_GROUP] or '').strip().upper()
-            vd = round(volume_diff(dims, req), 4)
-            # MCE always last; all other families sort by volume proximity
-            mce_last = 1 if grp == 'MCE' else 0
+            grp    = str(row[COL_GROUP] or '').strip().upper()
+            vd     = round(volume_diff(dims, req), 4)
+            exact  = exact_dim_count(dims, req)
+            mce    = 1 if grp == 'MCE' else 0   # MCE always last
             results.append({
                 'group'      : row[COL_GROUP],
                 'code'       : row[COL_CODE],
@@ -88,7 +97,8 @@ def main():
                 'weight_kg'  : row[COL_WEIGHT],
                 'weblink'    : str(row[COL_URL] or ''),
                 'vol_diff'   : vd,
-                '_sort'      : (mce_last, vd),
+                'exact_dims' : exact,
+                '_sort'      : (mce, -exact, vd),
             })
 
     results.sort(key=lambda x: x['_sort'])
