@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 List all Fibox products for a given product group.
-Usage: python3 list_by_group.py <group_name> [category_filter]
+Usage: python3 list_by_group.py <group_name> [category_keyword]
 """
 import sys, json, re, os
 import openpyxl
@@ -33,31 +33,24 @@ def parse_dim(dim_str):
             pass
     return (0, 0, 0)
 
-def main():
-    if len(sys.argv) < 2:
-        print(json.dumps({'error': 'Usage: list_by_group.py <group> [category_keyword]'}))
-        sys.exit(1)
+def row_matches_keyword(row, keyword):
+    """Check if keyword appears in category, symbol, or description."""
+    fields = [row[COL_CAT], row[COL_SYMBOL], row[COL_DESC]]
+    keyword_up = keyword.upper()
+    return any(keyword_up in str(f or '').upper() for f in fields)
 
-    group_filter    = sys.argv[1].strip().upper()
-    category_filter = sys.argv[2].strip().upper() if len(sys.argv) > 2 else ''
-
-    if not os.path.exists(DATA_FILE):
-        print(json.dumps({'error': f'Data file not found: {DATA_FILE}'}))
-        sys.exit(1)
-
+def load_rows(group_filter, category_filter=''):
     wb = openpyxl.load_workbook(DATA_FILE, data_only=True, read_only=True)
     ws = wb['PRODUCTS']
     results = []
-
     for row in ws.iter_rows(min_row=DATA_START, values_only=True):
         grp = str(row[COL_GROUP] or '').strip().upper()
         cat = str(row[COL_CAT]   or '').strip().upper()
         if grp != group_filter:
             continue
-        if category_filter and category_filter not in cat:
-            continue
-        # Skip pure accessories rows
         if 'ACCESSOR' in cat:
+            continue
+        if category_filter and not row_matches_keyword(row, category_filter):
             continue
         dims = parse_dim(row[COL_DIM])
         results.append({
@@ -74,14 +67,32 @@ def main():
             'weight_kg'  : row[COL_WEIGHT],
             'weblink'    : str(row[COL_URL] or ''),
         })
+    wb.close()
+    return results
 
-    # Sort by dimensions: W, D, H
+def main():
+    if len(sys.argv) < 2:
+        print(json.dumps({'error': 'Usage: list_by_group.py <group> [category_keyword]'}))
+        sys.exit(1)
+
+    group_filter    = sys.argv[1].strip().upper()
+    category_filter = sys.argv[2].strip() if len(sys.argv) > 2 else ''
+
+    if not os.path.exists(DATA_FILE):
+        print(json.dumps({'error': f'Data file not found: {DATA_FILE}'}))
+        sys.exit(1)
+
+    results = load_rows(group_filter, category_filter)
+
+    # If keyword filter returned nothing, retry without it
+    if not results and category_filter:
+        results = load_rows(group_filter, '')
+
     results.sort(key=lambda x: (x['width_mm'], x['depth_mm'], x['height_mm']))
 
-    wb.close()
     print(json.dumps({
-        'group'  : sys.argv[1],
-        'count'  : len(results),
+        'group'   : sys.argv[1],
+        'count'   : len(results),
         'products': results[:60]
     }))
 
