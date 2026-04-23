@@ -14,138 +14,102 @@ LIST_PY     = os.path.join(SCRIPTS_DIR, "list_by_group.py")
 SYSTEM_PROMPT = """You are a Fibox product specialist assistant. Help customers find the right Fibox enclosure.
 
 ## About Fibox
-Fibox is a Finnish manufacturer of polycarbonate (PC), ABS, and GRP enclosures used in
-industrial, electrical, and outdoor applications.
+Fibox is a Finnish manufacturer of polycarbonate (PC), ABS, and GRP enclosures used in industrial, electrical, and outdoor applications.
 
 ## Product Families
-- NEO      : Modern polycarbonate enclosures, IK10, IP66/67
-- ARCA     : Classic wall-mount cabinets, PC or steel door
-- MNX      : Compact polycarbonate enclosures
-- EURONORD : DIN-rail and wall-mount enclosures, PC/ABS/Polyester
-- TEMPO    : Lightweight ABS/PC enclosures
-- SOLID    : Heavy-duty GRP enclosures
-- CAB      : ABS and PC enclosures
-- EK       : Junction box systems
-- PICCOLO  : Small enclosures
-- MCE      : Metal enclosures
-- ACCE     : Accessories (mounting plates, locks, etc.)
-- CABLE GLANDS : Cable entries and glands
+- NEO: Modern polycarbonate enclosures, IK10, IP66/67
+- ARCA: Classic wall-mount cabinets, PC or steel door
+- MNX: Compact polycarbonate enclosures
+- EURONORD: DIN-rail and wall-mount enclosures, PC/ABS/Polyester
+- TEMPO: Lightweight ABS/PC enclosures
+- SOLID: Heavy-duty GRP enclosures
+- CAB: ABS and PC enclosures
+- ACCE: Accessories
+- CABLE GLANDS: Cable entries and glands
 
 ## Dimension Convention
 All dimensions are in millimetres: Width x Depth x Height.
 Convert cm to mm if the customer uses centimetres (multiply by 10).
 
-## Search Tolerance
-Match products whose W, D, H each fall within +/-20% of the requested values.
+## Tool Selection Rules
+- Customer gives dimensions (e.g. 300x250x150) -> use search_enclosures
+- Customer asks to see a product range/family (e.g. "show ARCA range", "list MNX products") -> use list_products_by_group
+- Customer asks about features/specs of a specific product -> use scrape_product
+- Customer asks where to buy -> use scrape_distributors
 
-## Your Workflow
-1. If the customer gives dimensions → call search_enclosures.
-2. If the customer asks to see a product range or family (e.g. "show ARCA IEC range", "list all MNX") → call list_products_by_group.
-3. Present results in a table with columns:
-   Symbol | Code | Dimensions | Description | Pack | Weight (kg) | Product Link
-   - Code comes from the 'code' field in the search result.
-   - Product Link: show the full URL as clickable link text.
-   - If Weblink is blank, write: https://www.fibox.com/products (general catalogue).
-   - Display results in EXACTLY the order returned by the tool. Do NOT re-sort.
-   - Results from search_enclosures are pre-sorted: best dimension matches first, MCE always last.
-4. If the customer asks for product benefits/features → call scrape_product with the URL.
-5. If the customer asks where to buy → call scrape_distributors with the country name.
-   Present the distributor info but do NOT proactively offer it unprompted.
+## Presenting Results
+Present results in a table: Symbol | Code | Dimensions | Description | Pack | Weight (kg) | Product Link
+- Display in EXACTLY the order returned by the tool. Do NOT re-sort.
+- Product Link: show the full URL as a clickable link.
+- If Weblink is blank, use: https://www.fibox.com/products
 
 ## Pricing
-Fibox does not publish pricing. If asked, reply:
-"Fibox does not publish pricing — prices vary by country, distributor, and order volume.
-Contact your local distributor via https://www.fibox.com (Sales Network / Where to Buy),
-or reach out to Fibox directly through their contact form. Have the product code ready."
-Do NOT proactively mention pricing or suggest the customer ask about it.
-
-## URL Coverage
-82% of products have a Weblink. Accessories and cable glands may have a blank Weblink —
-in that case, direct the customer to https://www.fibox.com/products.
+Fibox does not publish pricing. If asked: "Fibox does not publish pricing - prices vary by country and distributor. Contact your local distributor via https://www.fibox.com or reach out via their contact form."
 
 ## Tone
-Professional, concise, and helpful. Always mention if no exact match was found and explain
-the closest alternatives clearly. Format responses with markdown for readability.
-Do NOT end responses by offering to provide pricing or distributor info unprompted."""
+Professional, concise, helpful. Use markdown formatting."""
 
 TOOLS = [
     {
         "name": "search_enclosures",
-        "description": (
-            "Search the Fibox product catalogue for enclosures matching specific dimensions. "
-            "Use ONLY when the customer provides W x D x H measurements. "
-            "Applies ±20% tolerance and returns up to 20 results ranked by best dimension match."
-        ),
+        "description": "Search Fibox enclosures by dimensions (W x D x H in mm). Use ONLY when the customer provides specific measurements. Returns up to 20 matches within 20 percent tolerance, ranked by closest match.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "width_mm":  {"type": "number", "description": "Required internal width in millimetres"},
-                "depth_mm":  {"type": "number", "description": "Required internal depth in millimetres"},
-                "height_mm": {"type": "number", "description": "Required internal height in millimetres"},
+                "width_mm":  {"type": "number", "description": "Internal width in millimetres"},
+                "depth_mm":  {"type": "number", "description": "Internal depth in millimetres"},
+                "height_mm": {"type": "number", "description": "Internal height in millimetres"}
             },
-            "required": ["width_mm", "depth_mm", "height_mm"],
-        },
+            "required": ["width_mm", "depth_mm", "height_mm"]
+        }
     },
     {
         "name": "list_products_by_group",
-        "description": (
-            "List all Fibox products in a specific product family/group. "
-            "Use when the customer asks to see a full range or family such as 'show ARCA IEC range', "
-            "'list all MNX products', 'what sizes does EURONORD come in', 'show the TEMPO range'. "
-            "Do NOT use this for dimension-based searches — use search_enclosures for that."
-        ),
+        "description": "List all products in a Fibox product family. Use when the customer asks to see a full range such as 'show ARCA range', 'list all MNX products', 'what sizes does EURONORD come in'. Do NOT use for dimension searches.",
         "input_schema": {
             "type": "object",
             "properties": {
                 "group": {
                     "type": "string",
-                    "description": "Product group name, e.g. 'ARCA', 'MNX', 'EURONORD', 'TEMPO', 'NEO', 'SOLID', 'CAB', 'EK', 'PICCOLO', 'MCE'"
+                    "description": "Product group name such as ARCA, MNX, EURONORD, TEMPO, NEO, SOLID, CAB, EK, PICCOLO, MCE"
                 },
                 "category_keyword": {
                     "type": "string",
-                    "description": "Optional keyword to filter by category, e.g. 'IEC', 'ABS', 'PC', 'Polyester'"
-                },
+                    "description": "Optional filter keyword such as ABS, PC, Polyester"
+                }
             },
-            "required": ["group"],
-        },
+            "required": ["group"]
+        }
     },
     {
         "name": "scrape_product",
-        "description": (
-            "Fetch product details, key features, and technical specifications from a "
-            "fibox.com product page. Use when the customer asks about benefits, certifications, "
-            "IP rating, or detailed specs of a specific product."
-        ),
+        "description": "Fetch product details and specs from a fibox.com product page. Use when the customer asks about features, IP rating, certifications, or detailed specs of a specific product.",
         "input_schema": {
             "type": "object",
             "properties": {
-                "url": {"type": "string", "description": "Full fibox.com product page URL"},
+                "url": {"type": "string", "description": "Full fibox.com product page URL"}
             },
-            "required": ["url"],
-        },
+            "required": ["url"]
+        }
     },
     {
         "name": "scrape_distributors",
-        "description": (
-            "Get Fibox distributor and dealer information from fibox.com, optionally filtered "
-            "by country. Use when the customer asks where to buy Fibox products."
-        ),
+        "description": "Get Fibox distributor information, optionally filtered by country. Use when the customer asks where to buy Fibox products.",
         "input_schema": {
             "type": "object",
             "properties": {
                 "country": {
                     "type": "string",
-                    "description": "Country name to filter results (e.g. 'Germany', 'Poland'). Leave empty for all countries.",
-                },
+                    "description": "Country name such as Germany or Poland. Leave empty for all countries."
+                }
             },
-            "required": [],
-        },
-    },
+            "required": []
+        }
+    }
 ]
 
 
 def run_script(cmd):
-    """Run a Python script and return parsed JSON output."""
     try:
         result = subprocess.run(
             [sys.executable] + cmd,
@@ -153,25 +117,18 @@ def run_script(cmd):
         )
         if result.stdout.strip():
             return json.loads(result.stdout)
-        else:
-            return {"error": result.stderr.strip() or "Script produced no output", "returncode": result.returncode}
+        return {"error": result.stderr.strip() or "Script produced no output", "returncode": result.returncode}
     except subprocess.TimeoutExpired:
-        return {"error": "Script timed out after 60 seconds"}
+        return {"error": "Script timed out"}
     except json.JSONDecodeError as e:
-        return {"error": f"Could not parse script output: {e}"}
+        return {"error": "Could not parse script output: " + str(e)}
     except Exception as e:
         return {"error": str(e)}
 
 
 def execute_tool(name, inputs):
-    """Dispatch a tool call to the appropriate script."""
     if name == "search_enclosures":
-        return run_script([
-            SEARCH_PY,
-            str(inputs["width_mm"]),
-            str(inputs["depth_mm"]),
-            str(inputs["height_mm"]),
-        ])
+        return run_script([SEARCH_PY, str(inputs["width_mm"]), str(inputs["depth_mm"]), str(inputs["height_mm"])])
     elif name == "list_products_by_group":
         cmd = [LIST_PY, inputs["group"]]
         if inputs.get("category_keyword"):
@@ -180,12 +137,11 @@ def execute_tool(name, inputs):
     elif name == "scrape_product":
         return run_script([SCRAPE_PY, "product", inputs["url"]])
     elif name == "scrape_distributors":
-        country = inputs.get("country", "")
         cmd = [SCRAPE_PY, "distributors"]
-        if country:
-            cmd.append(country)
+        if inputs.get("country"):
+            cmd.append(inputs["country"])
         return run_script(cmd)
-    return {"error": f"Unknown tool: {name}"}
+    return {"error": "Unknown tool: " + name}
 
 
 @app.route("/")
@@ -200,8 +156,7 @@ def health():
 
 @app.route("/test")
 def test_search():
-    result = run_script([SEARCH_PY, "300", "250", "150"])
-    return jsonify(result)
+    return jsonify(run_script([SEARCH_PY, "300", "250", "150"]))
 
 
 @app.route("/chat", methods=["POST"])
@@ -214,9 +169,7 @@ def chat():
         if not user_msg:
             return jsonify({"error": "Empty message"}), 400
 
-        messages = []
-        for turn in history:
-            messages.append({"role": turn["role"], "content": turn["content"]})
+        messages = [{"role": t["role"], "content": t["content"]} for t in history]
         messages.append({"role": "user", "content": user_msg})
 
         for _ in range(10):
@@ -231,7 +184,7 @@ def chat():
             if response.stop_reason == "end_turn":
                 text = next(
                     (block.text for block in response.content if hasattr(block, "text")),
-                    "I couldn't generate a response. Please try again."
+                    "I could not generate a response. Please try again."
                 )
                 return jsonify({"response": text})
 
@@ -254,7 +207,7 @@ def chat():
 
     except Exception as e:
         import traceback; traceback.print_exc()
-        return jsonify({"error": f"Server error: {str(e)}"}), 500
+        return jsonify({"error": "Server error: " + str(e)}), 500
 
 
 if __name__ == "__main__":
