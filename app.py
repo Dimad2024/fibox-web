@@ -9,6 +9,7 @@ BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
 SCRIPTS_DIR = os.path.join(BASE_DIR, "scripts")
 SEARCH_PY   = os.path.join(SCRIPTS_DIR, "search_enclosures.py")
 SCRAPE_PY   = os.path.join(SCRIPTS_DIR, "scrape_fibox.py")
+LIST_PY     = os.path.join(SCRIPTS_DIR, "list_by_group.py")
 
 SYSTEM_PROMPT = """You are a Fibox product specialist assistant. Help customers find the right Fibox enclosure.
 
@@ -114,6 +115,29 @@ TOOLS = [
             "required": [],
         },
     },
+    {
+        "name": "list_products_by_group",
+        "description": (
+            "List all Fibox products in a specific product family/group, e.g. ARCA, MNX, "
+            "EURONORD, TEMPO, NEO, SOLID, CAB, EK, PICCOLO. Use this when the customer asks "
+            "to see a full range or family of products, NOT when they give specific dimensions. "
+            "Optionally filter by a category keyword such as 'IEC', 'ABS', 'PC', 'Polyester'."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "group": {
+                    "type": "string",
+                    "description": "Product group name, e.g. 'ARCA', 'MNX', 'EURONORD', 'TEMPO', 'NEO'"
+                },
+                "category_keyword": {
+                    "type": "string",
+                    "description": "Optional keyword to filter by category, e.g. 'IEC', 'ABS', 'PC'"
+                },
+            },
+            "required": ["group"],
+        },
+    },
 ]
 
 
@@ -152,6 +176,11 @@ def execute_tool(name, inputs):
         cmd = [SCRAPE_PY, "distributors"]
         if country:
             cmd.append(country)
+        return run_script(cmd)
+    elif name == "list_products_by_group":
+        cmd = [LIST_PY, inputs["group"]]
+        if inputs.get("category_keyword"):
+            cmd.append(inputs["category_keyword"])
         return run_script(cmd)
     return {"error": f"Unknown tool: {name}"}
 
