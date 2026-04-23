@@ -18,12 +18,18 @@ Fibox is a Finnish manufacturer of polycarbonate (PC), ABS, and GRP enclosures u
 industrial, electrical, and outdoor applications.
 
 ## Product Families
-- NEO   : Modern polycarbonate enclosures, IK10, IP66/67
-- ARCA  : Classic wall-mount cabinets, PC or steel door
-- MER   : Metric series enclosures
-- SOLID : Heavy-duty GRP enclosures
-- ACCE  : Accessories (mounting plates, locks, etc.)
-- CABLE GLANDS : Cable entries and glands (no dedicated product page)
+- NEO      : Modern polycarbonate enclosures, IK10, IP66/67
+- ARCA     : Classic wall-mount cabinets, PC or steel door
+- MNX      : Compact polycarbonate enclosures
+- EURONORD : DIN-rail and wall-mount enclosures, PC/ABS/Polyester
+- TEMPO    : Lightweight ABS/PC enclosures
+- SOLID    : Heavy-duty GRP enclosures
+- CAB      : ABS and PC enclosures
+- EK       : Junction box systems
+- PICCOLO  : Small enclosures
+- MCE      : Metal enclosures
+- ACCE     : Accessories (mounting plates, locks, etc.)
+- CABLE GLANDS : Cable entries and glands
 
 ## Dimension Convention
 All dimensions are in millimetres: Width x Depth x Height.
@@ -31,21 +37,19 @@ Convert cm to mm if the customer uses centimetres (multiply by 10).
 
 ## Search Tolerance
 Match products whose W, D, H each fall within +/-20% of the requested values.
-Rank results by how close total volume is to the requested volume.
 
 ## Your Workflow
-1. Extract W, D, H in mm from the customer query.
-2. Call search_enclosures to find matching products (+/-20% tolerance).
+1. If the customer gives dimensions → call search_enclosures.
+2. If the customer asks to see a product range or family (e.g. "show ARCA IEC range", "list all MNX") → call list_products_by_group.
 3. Present results in a table with columns:
    Symbol | Code | Dimensions | Description | Pack | Weight (kg) | Product Link
    - Code comes from the 'code' field in the search result.
-   - Product Link: show the full URL as clickable link text, e.g. [https://www.fibox.com/products/...](https://www.fibox.com/products/...)
+   - Product Link: show the full URL as clickable link text.
    - If Weblink is blank, write: https://www.fibox.com/products (general catalogue).
    - Display results in EXACTLY the order returned by the tool. Do NOT re-sort.
-   - Results with exact_dims >= 2 are the closest matches (2+ individual dimensions match the request closely). Label that group "Closest Matches". Remaining results go under "Other Close Matches".
-   - MCE products are always shown last.
-4. If the customer asks for product benefits/features, call scrape_product with the URL.
-5. If the customer asks where to buy, call scrape_distributors with the country name.
+   - Results from search_enclosures are pre-sorted: best dimension matches first, MCE always last.
+4. If the customer asks for product benefits/features → call scrape_product with the URL.
+5. If the customer asks where to buy → call scrape_distributors with the country name.
    Present the distributor info but do NOT proactively offer it unprompted.
 
 ## Pricing
@@ -68,10 +72,9 @@ TOOLS = [
     {
         "name": "search_enclosures",
         "description": (
-            "Search the Fibox product catalogue for enclosures matching the requested dimensions. "
-            "Applies ±20% tolerance on each dimension and returns up to 20 results ranked by "
-            "how close the volume is to the requested volume. Each result includes the product "
-            "symbol, dimensions, description, packing unit, weight, and product page URL."
+            "Search the Fibox product catalogue for enclosures matching specific dimensions. "
+            "Use ONLY when the customer provides W x D x H measurements. "
+            "Applies ±20% tolerance and returns up to 20 results ranked by best dimension match."
         ),
         "input_schema": {
             "type": "object",
@@ -81,6 +84,29 @@ TOOLS = [
                 "height_mm": {"type": "number", "description": "Required internal height in millimetres"},
             },
             "required": ["width_mm", "depth_mm", "height_mm"],
+        },
+    },
+    {
+        "name": "list_products_by_group",
+        "description": (
+            "List all Fibox products in a specific product family/group. "
+            "Use when the customer asks to see a full range or family such as 'show ARCA IEC range', "
+            "'list all MNX products', 'what sizes does EURONORD come in', 'show the TEMPO range'. "
+            "Do NOT use this for dimension-based searches — use search_enclosures for that."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "group": {
+                    "type": "string",
+                    "description": "Product group name, e.g. 'ARCA', 'MNX', 'EURONORD', 'TEMPO', 'NEO', 'SOLID', 'CAB', 'EK', 'PICCOLO', 'MCE'"
+                },
+                "category_keyword": {
+                    "type": "string",
+                    "description": "Optional keyword to filter by category, e.g. 'IEC', 'ABS', 'PC', 'Polyester'"
+                },
+            },
+            "required": ["group"],
         },
     },
     {
@@ -115,29 +141,6 @@ TOOLS = [
             "required": [],
         },
     },
-    {
-        "name": "list_products_by_group",
-        "description": (
-            "List all Fibox products in a specific product family/group, e.g. ARCA, MNX, "
-            "EURONORD, TEMPO, NEO, SOLID, CAB, EK, PICCOLO. Use this when the customer asks "
-            "to see a full range or family of products, NOT when they give specific dimensions. "
-            "Optionally filter by a category keyword such as 'IEC', 'ABS', 'PC', 'Polyester'."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "group": {
-                    "type": "string",
-                    "description": "Product group name, e.g. 'ARCA', 'MNX', 'EURONORD', 'TEMPO', 'NEO'"
-                },
-                "category_keyword": {
-                    "type": "string",
-                    "description": "Optional keyword to filter by category, e.g. 'IEC', 'ABS', 'PC'"
-                },
-            },
-            "required": ["group"],
-        },
-    },
 ]
 
 
@@ -155,7 +158,7 @@ def run_script(cmd):
     except subprocess.TimeoutExpired:
         return {"error": "Script timed out after 60 seconds"}
     except json.JSONDecodeError as e:
-        return {"error": f"Could not parse script output: {e}", "raw": result.stdout[:500]}
+        return {"error": f"Could not parse script output: {e}"}
     except Exception as e:
         return {"error": str(e)}
 
@@ -169,6 +172,11 @@ def execute_tool(name, inputs):
             str(inputs["depth_mm"]),
             str(inputs["height_mm"]),
         ])
+    elif name == "list_products_by_group":
+        cmd = [LIST_PY, inputs["group"]]
+        if inputs.get("category_keyword"):
+            cmd.append(inputs["category_keyword"])
+        return run_script(cmd)
     elif name == "scrape_product":
         return run_script([SCRAPE_PY, "product", inputs["url"]])
     elif name == "scrape_distributors":
@@ -176,11 +184,6 @@ def execute_tool(name, inputs):
         cmd = [SCRAPE_PY, "distributors"]
         if country:
             cmd.append(country)
-        return run_script(cmd)
-    elif name == "list_products_by_group":
-        cmd = [LIST_PY, inputs["group"]]
-        if inputs.get("category_keyword"):
-            cmd.append(inputs["category_keyword"])
         return run_script(cmd)
     return {"error": f"Unknown tool: {name}"}
 
@@ -190,65 +193,68 @@ def index():
     return render_template("index.html")
 
 
-@app.route("/chat", methods=["POST"])
-def chat():
-    data     = request.get_json()
-    history  = data.get("history", [])   # list of {role, content} from the frontend
-    user_msg = data.get("message", "").strip()
-
-    if not user_msg:
-        return jsonify({"error": "Empty message"}), 400
-
-    # Build message list from history + new user message
-    messages = []
-    for turn in history:
-        messages.append({"role": turn["role"], "content": turn["content"]})
-    messages.append({"role": "user", "content": user_msg})
-
-    # Agentic loop — keep going until Claude stops calling tools
-    for _ in range(10):   # safety limit
-        response = client.messages.create(
-            model="claude-sonnet-4-5",
-            max_tokens=4096,
-            system=SYSTEM_PROMPT,
-            tools=TOOLS,
-            messages=messages,
-        )
-
-        if response.stop_reason == "end_turn":
-            # Extract final text response
-            text = next(
-                (block.text for block in response.content if hasattr(block, "text")),
-                "I couldn't generate a response. Please try again."
-            )
-            return jsonify({"response": text})
-
-        if response.stop_reason == "tool_use":
-            # Execute all requested tools
-            tool_results = []
-            for block in response.content:
-                if block.type == "tool_use":
-                    result = execute_tool(block.name, block.input)
-                    tool_results.append({
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": json.dumps(result),
-                    })
-
-            # Add assistant turn + tool results and loop
-            messages.append({"role": "assistant", "content": response.content})
-            messages.append({"role": "user",      "content": tool_results})
-        else:
-            break
-
-    return jsonify({"response": "I ran into an issue processing your request. Please try again."})
+@app.route("/health")
+def health():
+    return jsonify({"status": "ok"})
 
 
 @app.route("/test")
 def test_search():
-    """Diagnostic: run search_enclosures with fixed dims and return raw result."""
     result = run_script([SEARCH_PY, "300", "250", "150"])
     return jsonify(result)
+
+
+@app.route("/chat", methods=["POST"])
+def chat():
+    try:
+        data     = request.get_json()
+        history  = data.get("history", [])
+        user_msg = data.get("message", "").strip()
+
+        if not user_msg:
+            return jsonify({"error": "Empty message"}), 400
+
+        messages = []
+        for turn in history:
+            messages.append({"role": turn["role"], "content": turn["content"]})
+        messages.append({"role": "user", "content": user_msg})
+
+        for _ in range(10):
+            response = client.messages.create(
+                model="claude-sonnet-4-5",
+                max_tokens=4096,
+                system=SYSTEM_PROMPT,
+                tools=TOOLS,
+                messages=messages,
+            )
+
+            if response.stop_reason == "end_turn":
+                text = next(
+                    (block.text for block in response.content if hasattr(block, "text")),
+                    "I couldn't generate a response. Please try again."
+                )
+                return jsonify({"response": text})
+
+            if response.stop_reason == "tool_use":
+                tool_results = []
+                for block in response.content:
+                    if block.type == "tool_use":
+                        result = execute_tool(block.name, block.input)
+                        tool_results.append({
+                            "type": "tool_result",
+                            "tool_use_id": block.id,
+                            "content": json.dumps(result),
+                        })
+                messages.append({"role": "assistant", "content": response.content})
+                messages.append({"role": "user",      "content": tool_results})
+            else:
+                break
+
+        return jsonify({"response": "I ran into an issue processing your request. Please try again."})
+
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({"error": f"Server error: {str(e)}"}), 500
 
 
 if __name__ == "__main__":
