@@ -174,14 +174,14 @@ def chat():
 
         for _ in range(10):
             response = client.messages.create(
-                model="claude-sonnet-4-5",
-                max_tokens=4096,
+                model="claude-sonnet-4-6",
+                max_tokens=8192,
                 system=SYSTEM_PROMPT,
                 tools=TOOLS,
                 messages=messages,
             )
 
-            if response.stop_reason == "end_turn":
+            if response.stop_reason in ("end_turn", "max_tokens"):
                 text = next(
                     (block.text for block in response.content if hasattr(block, "text")),
                     "I could not generate a response. Please try again."
