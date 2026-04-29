@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Fibox Product Assistant</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
   <style>
@@ -65,6 +65,7 @@
     #chat {
       flex: 1;
       overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
       padding: 24px 16px;
       display: flex;
       flex-direction: column;
@@ -252,10 +253,43 @@
 
     /* ── responsive ───────────────────────────────────────────────────────── */
     @media (max-width: 600px) {
-      #chat { padding: 16px 10px; }
-      .input-bar { padding: 10px 10px; }
-      .bubble { font-size: 13.5px; }
+      /* Header */
+      header { height: 56px; padding: 0 12px; }
+      .logo-wrap img { height: 34px; }
+      .header-title { font-size: 16px; }
+      .header-badge { display: none; }          /* hide badge to avoid overlap */
+
+      /* Chat */
+      #chat { padding: 12px 8px; gap: 12px; }
+
+      /* Bubbles — hide avatars to give full width to content */
+      .avatar { display: none; }
+      .bubble {
+        font-size: 14px;
+        max-width: 100%;
+        padding: 10px 13px;
+      }
+
+      /* Tables — horizontal scroll with compact sizing */
+      .bubble table { font-size: 11px; }
+      .bubble th, .bubble td { padding: 6px 8px; }
+      .bubble td:nth-child(4) { min-width: 130px; }
+      .bubble td:nth-child(7) { min-width: 110px; }
+
+      /* Welcome card */
+      .welcome { max-width: 100%; margin: 8px 0; }
       .welcome-img { height: 160px; }
+      .welcome-body { padding: 16px; }
+      .welcome h2 { font-size: 16px; }
+
+      /* Suggestions */
+      .suggestions { padding: 0 8px 10px; gap: 6px; }
+      .suggestion-btn { font-size: 12px; padding: 6px 12px; }
+
+      /* Input bar — prevent iOS auto-zoom (needs font-size ≥ 16px) */
+      .input-bar { padding: 10px 8px; padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
+      #user-input { font-size: 16px; padding: 9px 14px; }
+      #send-btn { width: 40px; height: 40px; }
     }
   </style>
 </head>
@@ -263,7 +297,7 @@
 
 <!-- ── Header ──────────────────────────────────────────────────────────────── -->
 <header>
-  <div class="logo-wrap">
+  <div class="logo-wrap" onclick="resetChat()" title="Back to start" style="cursor:pointer;">
     <img src="/static/fibox-logo.png" alt="Fibox" />
   </div>
   <span class="header-title">Product Assistant</span>
@@ -283,12 +317,7 @@
 </div>
 
 <!-- ── Suggested prompts ───────────────────────────────────────────────────── -->
-<div class="suggestions" id="suggestions">
-  <button class="suggestion-btn" onclick="sendSuggestion(this)">What gasket material is used in MNX enclosures?</button>
-  <button class="suggestion-btn" onclick="sendSuggestion(this)">What is the most impact-resistant Fibox enclosure?</button>
-  <button class="suggestion-btn" onclick="sendSuggestion(this)">What mounting accessories are available for NEO?</button>
-  <button class="suggestion-btn" onclick="sendSuggestion(this)">Show EURONORD range</button>
-</div>
+<div class="suggestions" id="suggestions"></div>
 
 <!-- ── Input bar ───────────────────────────────────────────────────────────── -->
 <div class="input-bar">
@@ -422,8 +451,93 @@
               .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
-  // Configure marked for safe rendering
-  marked.setOptions({ breaks: true, gfm: true });
+  // Open all links in a new tab
+  const renderer = new marked.Renderer();
+  renderer.link = (href, title, text) =>
+    `<a href="${href}" target="_blank" rel="noopener"${title ? ` title="${title}"` : ''}>${text}</a>`;
+  marked.setOptions({ breaks: true, gfm: true, renderer });
+
+  // ── Sample prompts ──────────────────────────────────────────────────────────
+  // First item always shown as prompt #1; remaining 3 picked randomly from the rest
+  const FIRST_PROMPTS = [
+    'I need enclosure 400×300×150',
+    'Find enclosure 300×250×100',
+    'Looking for something around 200×200×100',
+    'Find enclosure 500×400×210',
+    'I need a shallow box, about 300×200×80',
+    'Something close to 150×150×100',
+    'Find enclosure around 600×400×210',
+    'I need a large enclosure 700×500×300',
+  ];
+
+  const OTHER_PROMPTS = [
+    'Show ARCA IEC range',
+    'Show NEO polycarbonate range',
+    'Show MNX compact range',
+    'Show EURONORD range',
+    'Show TEMPO lightweight range',
+    'Show SOLID GRP range',
+    'List CAB ABS enclosures',
+    'Show PICCOLO miniature range',
+    'Show ARCA cabinets with window cover',
+    'Show ARCA cabinets with swinghandle',
+    'List ARCA cabinets without mounting plate',
+    'Compare ARCA and SOLID enclosures',
+    'Compare MNX and EURONORD for DIN-rail use',
+    'Compare NEO and MNX — which is better outdoors?',
+    'Advantages of ARCA vs metal cabinets',
+    'Polycarbonate vs ABS — what is the difference?',
+    'What are the benefits of Polycarbonate vs Metal?',
+    'When should I choose GRP over polycarbonate?',
+    'What is better for outdoor use — NEO or SOLID?',
+    'Which enclosure is best for corrosive environments?',
+    'What is the most impact-resistant Fibox enclosure?',
+    'What IP rating does NEO have?',
+    'What does IK10 impact rating mean?',
+    'Which enclosures are UV-resistant?',
+    'Are Fibox enclosures halogen-free?',
+    'What temperature range do Fibox enclosures support?',
+    'Which enclosures have a transparent cover option?',
+    'What gasket material is used in MNX enclosures?',
+    'Which enclosures are UL-certified?',
+    'What mounting accessories are available for NEO?',
+    'Do Fibox enclosures support DIN rail mounting?',
+    'Best enclosure for an outdoor electrical panel',
+    'Enclosure for a Raspberry Pi project',
+    'Enclosure for industrial control cabinet',
+    'Suitable enclosure for food industry use',
+    'What enclosure for marine / coastal environment?',
+    'Where to buy Fibox in Germany?',
+    'Where to buy Fibox in Poland?',
+    'Where to buy Fibox in the UK?',
+    'Where to buy Fibox in France?',
+    'Who are the Fibox distributors in Scandinavia?',
+  ];
+
+  function renderSuggestions() {
+    const first = FIRST_PROMPTS[Math.floor(Math.random() * FIRST_PROMPTS.length)];
+    const rest  = [...OTHER_PROMPTS].sort(() => Math.random() - 0.5).slice(0, 3);
+    suggsEl.innerHTML = [first, ...rest]
+      .map(s => `<button class="suggestion-btn" onclick="sendSuggestion(this)">${s}</button>`)
+      .join('');
+  }
+
+  function resetChat() {
+    history = [];
+    chatEl.innerHTML = `
+      <div class="welcome" id="welcome-card">
+        <img class="welcome-img" src="/static/fibox-products.jpg" alt="Fibox Enclosures" />
+        <div class="welcome-body">
+          <h2>Welcome to the Fibox Product Assistant</h2>
+          <p>I can help you find the right enclosure by size, provide product links,
+             packaging details, and tell you where to buy Fibox products in your country.</p>
+        </div>
+      </div>`;
+    suggsEl.style.display = '';
+    renderSuggestions();
+  }
+
+  renderSuggestions();
 </script>
 </body>
 </html>

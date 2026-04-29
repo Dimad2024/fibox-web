@@ -54,24 +54,9 @@ def exact_dim_count(dims, target, thresh=EXACT_THRESH):
     )
 
 
-def main():
-    if len(sys.argv) != 4:
-        print(json.dumps({'error': 'Usage: search_enclosures.py W D H'}))
-        sys.exit(1)
-    try:
-        req = tuple(float(a) for a in sys.argv[1:4])
-    except ValueError:
-        print(json.dumps({'error': 'W, D, H must be numbers (mm)'}))
-        sys.exit(1)
-
-    if not os.path.exists(DATA_FILE):
-        print(json.dumps({'error': f'Data file not found: {DATA_FILE}'}))
-        sys.exit(1)
-
-    wb = openpyxl.load_workbook(DATA_FILE, data_only=True, read_only=True)
-    ws = wb['PRODUCTS']
+def search(ws, req):
+    """Return sorted matches for the given (W, D, H) request tuple."""
     results = []
-
     for row in ws.iter_rows(min_row=DATA_START, values_only=True):
         dims = parse_dim(row[COL_DIM])
         if dims is None:
@@ -80,10 +65,10 @@ def main():
         if (within_tolerance(W, req[0], TOLERANCE) and
             within_tolerance(D, req[1], TOLERANCE) and
             within_tolerance(H, req[2], TOLERANCE)):
-            grp    = str(row[COL_GROUP] or '').strip().upper()
-            vd     = round(volume_diff(dims, req), 4)
-            exact  = exact_dim_count(dims, req)
-            mce    = 1 if grp == 'MCE' else 0   # MCE always last
+            grp   = str(row[COL_GROUP] or '').strip().upper()
+            vd    = round(volume_diff(dims, req), 4)
+            exact = exact_dim_count(dims, req)
+            mce   = 1 if grp == 'MCE' else 0
             results.append({
                 'group'      : row[COL_GROUP],
                 'code'       : row[COL_CODE],
@@ -100,16 +85,48 @@ def main():
                 'exact_dims' : exact,
                 '_sort'      : (mce, -exact, vd),
             })
-
     results.sort(key=lambda x: x['_sort'])
     for r in results:
         del r['_sort']
+    return results
+
+
+def main():
+    if len(sys.argv) != 4:
+        print(json.dumps({'error': 'Usage: search_enclosures.py W D H'}))
+        sys.exit(1)
+    try:
+        req = tuple(float(a) for a in sys.argv[1:4])
+    except ValueError:
+        print(json.dumps({'error': 'W, D, H must be numbers (mm)'}))
+        sys.exit(1)
+
+    if not os.path.exists(DATA_FILE):
+        print(json.dumps({'error': f'Data file not found: {DATA_FILE}'}))
+        sys.exit(1)
+
+    wb = openpyxl.load_workbook(DATA_FILE, data_only=True, read_only=True)
+    ws = wb['PRODUCTS']
+
+    # Primary search: W x D x H as requested
+    primary = search(ws, req)
+    primary_codes = {r['code'] for r in primary}
+
+    # Swapped search: D x W x H (only meaningful when W != D)
+    swapped = []
+    if abs(req[0] - req[1]) > 1:          # skip if W ≈ D (square footprint)
+        req_swap = (req[1], req[0], req[2])
+        swapped = [r for r in search(ws, req_swap)
+                   if r['code'] not in primary_codes]
 
     wb.close()
     print(json.dumps({
-        'requested': {'W': req[0], 'D': req[1], 'H': req[2]},
-        'count'    : len(results),
-        'matches'  : results[:20]
+        'requested'       : {'W': req[0], 'D': req[1], 'H': req[2]},
+        'count'           : len(primary),
+        'matches'         : primary[:20],
+        'swapped_requested': {'W': req[1], 'D': req[0], 'H': req[2]},
+        'swapped_count'   : len(swapped),
+        'swapped_matches' : swapped[:20],
     }))
 
 

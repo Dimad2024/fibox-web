@@ -10,6 +10,7 @@ SCRIPTS_DIR = os.path.join(BASE_DIR, "scripts")
 SEARCH_PY   = os.path.join(SCRIPTS_DIR, "search_enclosures.py")
 SCRAPE_PY   = os.path.join(SCRIPTS_DIR, "scrape_fibox.py")
 LIST_PY     = os.path.join(SCRIPTS_DIR, "list_by_group.py")
+LOOKUP_PY   = os.path.join(SCRIPTS_DIR, "lookup_by_code.py")
 
 SYSTEM_PROMPT = """You are a Fibox product specialist assistant. Help customers find the right Fibox enclosure.
 
@@ -36,12 +37,21 @@ Convert cm to mm if the customer uses centimetres (multiply by 10).
 - Customer asks to see a product range/family (e.g. "show ARCA range", "list MNX products") -> use list_products_by_group
 - Customer asks about features/specs of a specific product -> use scrape_product
 - Customer asks where to buy -> use scrape_distributors
+- Customer gives a product code (e.g. "show me 7032810", "what is 6011321") -> call lookup_product_by_code first to get the product details and Weblink, then call scrape_product with that URL. Never guess or construct a URL manually.
 
-## Presenting Results
-Present results in a table: Symbol | Code | Dimensions | Description | Pack | Weight (kg) | Product Link
+## Presenting Search Results
+The search_enclosures tool returns two lists:
+1. `matches` — products matching the requested W × D × H orientation.
+2. `swapped_matches` — additional products matching the D × W × H orientation (width and depth swapped). These are not duplicates of the first list.
+
+Present both lists as separate tables with columns: Symbol | Code | Dimensions | Description | Pack | Weight (kg) | Product Link
 - Display in EXACTLY the order returned by the tool. Do NOT re-sort.
-- Product Link: show the full URL as a clickable link.
-- If Weblink is blank, use: https://www.fibox.com/products
+- Product Link: show the full URL as a clickable link. If Weblink is blank, use: https://www.fibox.com/products
+- Before the swapped list, add a short note: "The following products match if you rotate the enclosure 90° (Width ↔ Depth swapped to D × W × H):"
+- If `swapped_matches` is empty, do not show the swapped section at all.
+
+After both tables, add a **Best Options** summary section. Pick the top 3–5 candidates across both lists based on closest volume match and practical fit. Format as a short bulleted list, each bullet including: Symbol, Code in backticks, dimensions, and one sentence on why it stands out (e.g. closest match, most compact, standard series, swapped orientation). Example format:
+- **ARCA 302015** `8120002` — 300×200×150 mm — exact match, standard ARCA IEC cabinet with mounting plate.
 
 ## Pricing
 Fibox does not publish pricing. If asked: "Fibox does not publish pricing - prices vary by country and distributor. Contact your local distributor via https://www.fibox.com or reach out via their contact form."
@@ -105,6 +115,20 @@ TOOLS = [
             },
             "required": []
         }
+    },
+    {
+        "name": "lookup_product_by_code",
+        "description": "Look up a Fibox product by its exact numeric code (e.g. 7032810). Use when the customer mentions a specific product code. Returns the product details including the Weblink for further scraping.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "description": "The numeric product code, e.g. '7032810'"
+                }
+            },
+            "required": ["code"]
+        }
     }
 ]
 
@@ -134,6 +158,8 @@ def execute_tool(name, inputs):
         if inputs.get("category_keyword"):
             cmd.append(inputs["category_keyword"])
         return run_script(cmd)
+    elif name == "lookup_product_by_code":
+        return run_script([LOOKUP_PY, inputs["code"]])
     elif name == "scrape_product":
         return run_script([SCRAPE_PY, "product", inputs["url"]])
     elif name == "scrape_distributors":
