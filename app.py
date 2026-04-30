@@ -11,6 +11,7 @@ SEARCH_PY   = os.path.join(SCRIPTS_DIR, "search_enclosures.py")
 SCRAPE_PY   = os.path.join(SCRIPTS_DIR, "scrape_fibox.py")
 LIST_PY     = os.path.join(SCRIPTS_DIR, "list_by_group.py")
 LOOKUP_PY   = os.path.join(SCRIPTS_DIR, "lookup_by_code.py")
+CONTACTS_PY = os.path.join(SCRIPTS_DIR, "contacts_lookup.py")
 
 SYSTEM_PROMPT = """You are a Fibox product specialist assistant. Help customers find the right Fibox enclosure.
 
@@ -36,7 +37,7 @@ Convert cm to mm if the customer uses centimetres (multiply by 10).
 - Customer gives dimensions (e.g. 300x250x150) -> use search_enclosures
 - Customer asks to see a product range/family (e.g. "show ARCA range", "list MNX products") -> use list_products_by_group
 - Customer asks about features/specs of a specific product -> use scrape_product
-- Customer asks where to buy -> use scrape_distributors
+- Customer asks where to buy, who to contact, or how to reach Fibox in a country -> use get_contacts
 - Customer gives a product code (e.g. "show me 7032810", "what is 6011321") -> call lookup_product_by_code first to get the product details and Weblink, then call scrape_product with that URL. Never guess or construct a URL manually.
 
 ## Presenting Search Results
@@ -52,6 +53,16 @@ Present both lists as separate tables with columns: Symbol | Code | Dimensions |
 
 After both tables, add a **Best Options** summary section. Pick the top 3–5 candidates across both lists based on closest volume match and practical fit. Format as a short bulleted list, each bullet including: Symbol, Code in backticks, dimensions, and one sentence on why it stands out (e.g. closest match, most compact, standard series, swapped orientation). Example format:
 - **ARCA 302015** `8120002` — 300×200×150 mm — exact match, standard ARCA IEC cabinet with mounting plate.
+
+## Presenting Contacts (get_contacts tool)
+The tool returns `sales` (list of persons) and `distributors` (list of companies).
+
+**Sales contacts** — present as a table: Name | Title | Email | Phone
+- Skip rows where both email and phone are empty.
+
+**Distributors** — present as a numbered list: **Company name** — website (as clickable link), email, phone.
+- Only show fields that are present.
+- If no distributors are returned, omit that section.
 
 ## Pricing
 Fibox does not publish pricing. If asked: "Fibox does not publish pricing - prices vary by country and distributor. Contact your local distributor via https://www.fibox.com or reach out via their contact form."
@@ -103,17 +114,17 @@ TOOLS = [
         }
     },
     {
-        "name": "scrape_distributors",
-        "description": "Get Fibox distributor information, optionally filtered by country. Use when the customer asks where to buy Fibox products.",
+        "name": "get_contacts",
+        "description": "Get Fibox sales contacts and distributors for a specific country. Use whenever the customer asks where to buy, who to contact, or how to reach Fibox in a specific country.",
         "input_schema": {
             "type": "object",
             "properties": {
                 "country": {
                     "type": "string",
-                    "description": "Country name such as Germany or Poland. Leave empty for all countries."
+                    "description": "Country name, e.g. Germany, Poland, UK, USA, France. Fuzzy matching is supported."
                 }
             },
-            "required": []
+            "required": ["country"]
         }
     },
     {
@@ -162,11 +173,8 @@ def execute_tool(name, inputs):
         return run_script([LOOKUP_PY, inputs["code"]])
     elif name == "scrape_product":
         return run_script([SCRAPE_PY, "product", inputs["url"]])
-    elif name == "scrape_distributors":
-        cmd = [SCRAPE_PY, "distributors"]
-        if inputs.get("country"):
-            cmd.append(inputs["country"])
-        return run_script(cmd)
+    elif name == "get_contacts":
+        return run_script([CONTACTS_PY, inputs["country"]])
     return {"error": "Unknown tool: " + name}
 
 
