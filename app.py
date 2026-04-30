@@ -1,9 +1,17 @@
 import os, json, subprocess, sys
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, session, redirect, url_for
 import anthropic
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("FLASK_SECRET", "fibox-secret-key-change-in-prod")
+
+PASSWORD = os.environ.get("APP_PASSWORD", "Fibox_agent")
+
 client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+
+
+def logged_in():
+    return session.get("auth") is True
 
 BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
 SCRIPTS_DIR = os.path.join(BASE_DIR, "scripts")
@@ -178,8 +186,27 @@ def execute_tool(name, inputs):
     return {"error": "Unknown tool: " + name}
 
 
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    error = ""
+    if request.method == "POST":
+        if request.form.get("password") == PASSWORD:
+            session["auth"] = True
+            return redirect(url_for("index"))
+        error = "Incorrect password."
+    return render_template("login.html", error=error)
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+
 @app.route("/")
 def index():
+    if not logged_in():
+        return redirect(url_for("login"))
     return render_template("index.html")
 
 
@@ -190,11 +217,15 @@ def health():
 
 @app.route("/test")
 def test_search():
+    if not logged_in():
+        return jsonify({"error": "Unauthorized"}), 401
     return jsonify(run_script([SEARCH_PY, "300", "250", "150"]))
 
 
 @app.route("/chat", methods=["POST"])
 def chat():
+    if not logged_in():
+        return jsonify({"error": "Unauthorized"}), 401
     try:
         data     = request.get_json()
         history  = data.get("history", [])
