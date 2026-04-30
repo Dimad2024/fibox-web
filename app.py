@@ -1,19 +1,66 @@
-import os, json, subprocess, sys
+import os, json, subprocess, sys, sqlite3
+from datetime import datetime
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for
 import anthropic
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET", "fibox-secret-key-change-in-prod")
 
-PASSWORD = os.environ.get("APP_PASSWORD", "Fibox_agent")
+# ── Per-user passwords ────────────────────────────────────────────────────────
+# Set via env var as JSON: USERS='{"tester1":"pass1","tester2":"pass2"}'
+# Falls back to single APP_PASSWORD mapped to user "default"
+_users_env = os.environ.get("USERS")
+if _users_env:
+    USERS = json.loads(_users_env)
+else:
+    USERS = {"default": os.environ.get("APP_PASSWORD", "Fibox_agent")}
+
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "Fibox_admin")
 
 client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
 
+# ── SQLite usage log ──────────────────────────────────────────────────────────
+BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
+DB_PATH     = os.path.join(BASE_DIR, "usage.db")
+
+def init_db():
+    con = sqlite3.connect(DB_PATH)
+    con.execute("""CREATE TABLE IF NOT EXISTS prompts (
+        id        INTEGER PRIMARY KEY AUTOINCREMENT,
+        ts        TEXT NOT NULL,
+        user      TEXT NOT NULL,
+        ip        TEXT NOT NULL,
+        message   TEXT NOT NULL,
+        status    TEXT NOT NULL DEFAULT 'pending'
+    )""")
+    # Add status column to existing DBs that predate this change
+    try:
+        con.execute("ALTER TABLE prompts ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'")
+    except Exception:
+        pass
+    con.commit(); con.close()
+
+init_db()
+
+def log_prompt(user, ip, message):
+    """Insert a new row and return its id so status can be updated later."""
+    con = sqlite3.connect(DB_PATH)
+    cur = con.execute(
+        "INSERT INTO prompts (ts, user, ip, message, status) VALUES (?,?,?,?,?)",
+        (datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"), user, ip, message[:300], "pending"))
+    row_id = cur.lastrowid
+    con.commit(); con.close()
+    return row_id
+
+def update_status(row_id, status):
+    con = sqlite3.connect(DB_PATH)
+    con.execute("UPDATE prompts SET status=? WHERE id=?", (status, row_id))
+    con.commit(); con.close()
+
 
 def logged_in():
-    return session.get("auth") is True
+    return session.get("user") is not None
 
-BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
 SCRIPTS_DIR = os.path.join(BASE_DIR, "scripts")
 SEARCH_PY   = os.path.join(SCRIPTS_DIR, "search_enclosures.py")
 SCRAPE_PY   = os.path.join(SCRIPTS_DIR, "scrape_fibox.py")
@@ -190,8 +237,10 @@ def execute_tool(name, inputs):
 def login():
     error = ""
     if request.method == "POST":
-        if request.form.get("password") == PASSWORD:
-            session["auth"] = True
+        pw = request.form.get("password", "")
+        matched = next((u for u, p in USERS.items() if p == pw), None)
+        if matched:
+            session["user"] = matched
             return redirect(url_for("index"))
         error = "Incorrect password."
     return render_template("login.html", error=error)
@@ -208,6 +257,26 @@ def index():
     if not logged_in():
         return redirect(url_for("login"))
     return render_template("index.html")
+
+
+@app.route("/admin", methods=["GET", "POST"])
+def admin():
+    if request.method == "POST":
+        if request.form.get("password") == ADMIN_PASSWORD:
+            session["admin"] = True
+        else:
+            return render_template("admin.html", auth=False, error="Wrong password.")
+    if not session.get("admin"):
+        return render_template("admin.html", auth=False, error="")
+    con = sqlite3.connect(DB_PATH)
+    rows = con.execute(
+        "SELECT ts, user, ip, status, message FROM prompts ORDER BY id DESC LIMIT 500"
+    ).fetchall()
+    stats = con.execute(
+        "SELECT user, COUNT(*) as cnt FROM prompts GROUP BY user ORDER BY cnt DESC"
+    ).fetchall()
+    con.close()
+    return render_template("admin.html", auth=True, rows=rows, stats=stats)
 
 
 @app.route("/health")
@@ -234,6 +303,10 @@ def chat():
         if not user_msg:
             return jsonify({"error": "Empty message"}), 400
 
+        ip     = request.headers.get("X-Forwarded-For", request.remote_addr).split(",")[0].strip()
+        user   = session.get("user", "unknown")
+        row_id = log_prompt(user, ip, user_msg)
+
         messages = [{"role": t["role"], "content": t["content"]} for t in history]
         messages.append({"role": "user", "content": user_msg})
 
@@ -251,6 +324,7 @@ def chat():
                     (block.text for block in response.content if hasattr(block, "text")),
                     "I could not generate a response. Please try again."
                 )
+                update_status(row_id, "success")
                 return jsonify({"response": text})
 
             if response.stop_reason == "tool_use":
@@ -268,10 +342,12 @@ def chat():
             else:
                 break
 
+        update_status(row_id, "failed")
         return jsonify({"response": "I ran into an issue processing your request. Please try again."})
 
     except Exception as e:
         import traceback; traceback.print_exc()
+        update_status(row_id, "failed")
         return jsonify({"error": "Server error: " + str(e)}), 500
 
 
