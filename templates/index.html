@@ -186,6 +186,28 @@
       background: #1F5C99; color: #fff; border-color: #1F5C99;
     }
 
+    /* ── attachment preview ──────────────────────────────────────────────── */
+    #attach-preview {
+      background: #F0F6FF;
+      border-top: 1px solid #D9E4EF;
+      padding: 8px 16px;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: #1F5C99;
+      flex-shrink: 0;
+    }
+    #attach-preview img {
+      height: 48px; width: 48px; object-fit: cover;
+      border-radius: 6px; border: 1px solid #C5D9EE;
+    }
+    #attach-preview .attach-name { flex: 1; font-weight: 500; }
+    #attach-preview .attach-remove {
+      cursor: pointer; color: #9DAFC2; font-size: 18px; line-height: 1;
+    }
+    #attach-preview .attach-remove:hover { color: #c0392b; }
+
     /* ── input bar ────────────────────────────────────────────────────────── */
     .input-bar {
       background: #fff;
@@ -196,6 +218,15 @@
       align-items: flex-end;
       flex-shrink: 0;
     }
+    #attach-btn {
+      width: 42px; height: 42px; border-radius: 50%;
+      background: #F0F6FF; border: 1.5px solid #C5D9EE;
+      cursor: pointer; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      transition: background .15s;
+      color: #1F5C99; font-size: 18px;
+    }
+    #attach-btn:hover { background: #D9EEFF; }
     #user-input {
       flex: 1;
       border: 1.5px solid #C5D9EE;
@@ -319,8 +350,18 @@
 <!-- ── Suggested prompts ───────────────────────────────────────────────────── -->
 <div class="suggestions" id="suggestions"></div>
 
+<!-- ── Attachment preview ──────────────────────────────────────────────────── -->
+<div id="attach-preview">
+  <img id="attach-thumb" src="" alt="" style="display:none" />
+  <span id="attach-icon" style="font-size:28px;display:none">📄</span>
+  <span class="attach-name" id="attach-name"></span>
+  <span class="attach-remove" onclick="clearAttachment()" title="Remove">×</span>
+</div>
+
 <!-- ── Input bar ───────────────────────────────────────────────────────────── -->
+<input type="file" id="file-input" accept="image/*,application/pdf" style="display:none" />
 <div class="input-bar">
+  <button id="attach-btn" onclick="document.getElementById('file-input').click()" title="Attach image or PDF">📎</button>
   <textarea id="user-input" rows="1"
     placeholder="Ask about enclosure sizes, products, or where to buy..."></textarea>
   <button id="send-btn" onclick="sendMessage()" title="Send">
@@ -329,10 +370,47 @@
 </div>
 
 <script>
-  const chatEl   = document.getElementById('chat');
-  const inputEl  = document.getElementById('user-input');
-  const sendBtn  = document.getElementById('send-btn');
-  const suggsEl  = document.getElementById('suggestions');
+  const chatEl    = document.getElementById('chat');
+  const inputEl   = document.getElementById('user-input');
+  const sendBtn   = document.getElementById('send-btn');
+  const suggsEl   = document.getElementById('suggestions');
+  const fileInput = document.getElementById('file-input');
+  const previewEl = document.getElementById('attach-preview');
+  let attachment  = null;   // {type, data (base64), media_type, name}
+
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      const b64 = e.target.result.split(',')[1];
+      const isImg = file.type.startsWith('image/');
+      attachment = {
+        type      : isImg ? 'image' : 'pdf',
+        data      : b64,
+        media_type: file.type,
+        name      : file.name,
+      };
+      document.getElementById('attach-name').textContent = file.name;
+      if (isImg) {
+        const thumb = document.getElementById('attach-thumb');
+        thumb.src = e.target.result; thumb.style.display = '';
+        document.getElementById('attach-icon').style.display = 'none';
+      } else {
+        document.getElementById('attach-thumb').style.display = 'none';
+        document.getElementById('attach-icon').style.display = '';
+      }
+      previewEl.style.display = 'flex';
+    };
+    reader.readAsDataURL(file);
+    fileInput.value = '';
+  });
+
+  function clearAttachment() {
+    attachment = null;
+    previewEl.style.display = 'none';
+    document.getElementById('attach-thumb').src = '';
+  }
 
   // Conversation history sent to the backend
   let history = [];
@@ -401,27 +479,37 @@
 
   async function sendMessage() {
     const text = inputEl.value.trim();
-    if (!text || sendBtn.disabled) return;
+    if ((!text && !attachment) || sendBtn.disabled) return;
 
     // Hide welcome card and suggestions after first message
     const welcome = document.getElementById('welcome-card');
     if (welcome) welcome.remove();
     suggsEl.style.display = 'none';
 
-    // Show user message
-    appendMsg('user', escapeHtml(text));
+    // Show user message (with attachment indicator if present)
+    let displayHtml = escapeHtml(text || '');
+    if (attachment) {
+      const icon = attachment.type === 'image' ? '🖼️' : '📄';
+      displayHtml += `<div style="margin-top:6px;font-size:12px;opacity:.8">${icon} ${escapeHtml(attachment.name)}</div>`;
+    }
+    appendMsg('user', displayHtml);
+
+    const sentAttachment = attachment;
     inputEl.value = '';
     inputEl.style.height = 'auto';
+    clearAttachment();
     sendBtn.disabled = true;
 
     // Show typing indicator
     showTyping();
 
     try {
+      const body = { message: text, history };
+      if (sentAttachment) body.attachment = sentAttachment;
       const res = await fetch('/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, history }),
+        body: JSON.stringify(body),
       });
 
       const data = await res.json();

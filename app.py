@@ -1,4 +1,4 @@
-import os, json, subprocess, sys, sqlite3
+import os, json, subprocess, sys, sqlite3, base64, io
 from datetime import datetime
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for
 import anthropic
@@ -22,6 +22,8 @@ client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
 # ── SQLite usage log ──────────────────────────────────────────────────────────
 BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
 DB_PATH     = os.path.join(BASE_DIR, "usage.db")
+SCRIPTS_DIR = os.path.join(BASE_DIR, "scripts")
+READ_DOC_PY = os.path.join(SCRIPTS_DIR, "read_doc.py")
 
 def init_db():
     con = sqlite3.connect(DB_PATH)
@@ -61,7 +63,6 @@ def update_status(row_id, status):
 def logged_in():
     return session.get("user") is not None
 
-SCRIPTS_DIR = os.path.join(BASE_DIR, "scripts")
 SEARCH_PY   = os.path.join(SCRIPTS_DIR, "search_enclosures.py")
 SCRAPE_PY   = os.path.join(SCRIPTS_DIR, "scrape_fibox.py")
 LIST_PY     = os.path.join(SCRIPTS_DIR, "list_by_group.py")
@@ -94,6 +95,9 @@ Convert cm to mm if the customer uses centimetres (multiply by 10).
 - Customer asks about features/specs of a specific product -> use scrape_product
 - Customer asks where to buy, who to contact, or how to reach Fibox in a country -> use get_contacts
 - Customer gives a product code (e.g. "show me 7032810", "what is 6011321") -> call lookup_product_by_code first to get the product details and Weblink, then call scrape_product with that URL. Never guess or construct a URL manually.
+- Customer asks about product benefits, advantages, overview, or general Fibox info -> call list_product_docs then read_product_doc for the relevant document.
+- Customer attaches an image -> analyse it visually and help identify the enclosure, dimensions, or installation context.
+- Customer attaches a PDF -> the text is already included in the message; use it directly to answer.
 
 ## Presenting Search Results
 The search_enclosures tool returns two lists:
@@ -118,6 +122,32 @@ The tool returns `sales` (list of persons) and `distributors` (list of companies
 **Distributors** — present as a numbered list: **Company name** — website (as clickable link), email, phone.
 - Only show fields that are present.
 - If no distributors are returned, omit that section.
+
+## ARCA T — New Transparent Door Range
+ARCA T is Fibox's newest transparent polycarbonate door cabinet. Same footprint as ARCA IEC — but with a clear PC door that lets you inspect contents without opening. Specs: IP66, IK09, –40…+80 °C.
+
+**ARCA T size/code table** (W × D × H mm → symbol → code):
+- 200×150×150 → ARCA 203015T → 8121020
+- 300×200×150 → ARCA 302015T → 8121002
+- 300×300×210 → ARCA 303021T → 8121005
+- 300×400×150 → ARCA 304015T → 8121022
+- 300×400×210 → ARCA 304021T → 8121023
+- 400×300×150 → ARCA 403015T → 8121006
+- 400×300×210 → ARCA 403021T → 8121007
+- 400×400×210 → ARCA 404021T → 8121009
+- 400×500×210 → ARCA 405021T → 8121025
+- 400×600×210 → ARCA 406021T → 8121026
+- 500×400×210 → ARCA 504021T → 8121011
+- 500×500×210 → ARCA 505021T → 8121032
+- 600×400×210 → ARCA 604021T → 8121012
+
+**ARCA W → ARCA T recommendation rule:** When the customer asks about ARCA W (window-cover) products or a search returns ARCA W products, check the table above for a matching ARCA T size and explicitly recommend it as an alternative with its symbol and code.
+
+**MANDATORY footer rule:** At the end of EVERY response that mentions or lists any ARCA product (ARCA IEC, ARCA W, ARCA T, or any response where a search returns ARCA results), append exactly this block after all other content:
+
+---
+💡 **New: ARCA T — Transparent Door Range**
+See inside your cabinet without opening it. ARCA T offers full IP66 protection with a clear polycarbonate door — same footprint as ARCA IEC. [Browse ARCA T →](https://www.fibox.com/products)
 
 ## Pricing
 Fibox does not publish pricing. If asked: "Fibox does not publish pricing - prices vary by country and distributor. Contact your local distributor via https://www.fibox.com or reach out via their contact form."
@@ -195,6 +225,22 @@ TOOLS = [
             },
             "required": ["code"]
         }
+    },
+    {
+        "name": "list_product_docs",
+        "description": "List available Fibox product PDF documents (overviews, brochures). Call this first to see what documents exist before reading one.",
+        "input_schema": {"type": "object", "properties": {}, "required": []}
+    },
+    {
+        "name": "read_product_doc",
+        "description": "Read the full text of a Fibox product PDF document. Use when the customer asks about product features, benefits, or details that may be covered in a product overview or brochure.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "filename": {"type": "string", "description": "PDF filename as returned by list_product_docs"}
+            },
+            "required": ["filename"]
+        }
     }
 ]
 
@@ -230,6 +276,10 @@ def execute_tool(name, inputs):
         return run_script([SCRAPE_PY, "product", inputs["url"]])
     elif name == "get_contacts":
         return run_script([CONTACTS_PY, inputs["country"]])
+    elif name == "list_product_docs":
+        return run_script([READ_DOC_PY, "list"])
+    elif name == "read_product_doc":
+        return run_script([READ_DOC_PY, "read", inputs["filename"]])
     return {"error": "Unknown tool: " + name}
 
 
@@ -308,7 +358,31 @@ def chat():
         row_id = log_prompt(user, ip, user_msg)
 
         messages = [{"role": t["role"], "content": t["content"]} for t in history]
-        messages.append({"role": "user", "content": user_msg})
+
+        # Build user content — text + optional attachment
+        attachment = data.get("attachment")  # {type, data (base64), media_type, name}
+        if attachment:
+            att_type = attachment.get("type")   # "image" or "pdf"
+            att_data = attachment.get("data")   # base64 string
+            raw      = base64.b64decode(att_data)
+            if att_type == "image":
+                user_content = [
+                    {"type": "image", "source": {
+                        "type": "base64",
+                        "media_type": attachment.get("media_type", "image/jpeg"),
+                        "data": att_data,
+                    }},
+                    {"type": "text", "text": user_msg or "Please describe what you see."},
+                ]
+            else:  # pdf — extract text and inject
+                from scripts.read_doc import extract_pdf_bytes
+                pdf_text = extract_pdf_bytes(raw)
+                user_content = [{"type": "text",
+                    "text": f"[Attached PDF: {attachment.get('name','document.pdf')}]\n\n{pdf_text}\n\n---\n{user_msg}"}]
+        else:
+            user_content = user_msg
+
+        messages.append({"role": "user", "content": user_content})
 
         for _ in range(10):
             response = client.messages.create(
