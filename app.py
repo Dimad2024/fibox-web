@@ -1,4 +1,9 @@
 import os, json, subprocess, sys, sqlite3, base64, io
+try:
+    import psycopg2
+    import psycopg2.extras
+except ImportError:
+    psycopg2 = None
 from datetime import datetime
 from flask import Flask, request, jsonify, render_template, session, redirect, url_for
 import anthropic
@@ -19,45 +24,74 @@ ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "Fibox_admin")
 
 client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
 
-# ── SQLite usage log ──────────────────────────────────────────────────────────
+# ── Database: PostgreSQL on Railway, SQLite locally ───────────────────────────
 BASE_DIR    = os.path.dirname(os.path.abspath(__file__))
 DB_PATH     = os.path.join(BASE_DIR, "usage.db")
 SCRIPTS_DIR = os.path.join(BASE_DIR, "scripts")
 READ_DOC_PY = os.path.join(SCRIPTS_DIR, "read_doc.py")
 
+DATABASE_URL = os.environ.get("DATABASE_URL")  # set automatically by Railway PostgreSQL
+USE_PG = bool(DATABASE_URL and psycopg2)
+
+def _pg():
+    return psycopg2.connect(DATABASE_URL, sslmode="require")
+
 def init_db():
-    con = sqlite3.connect(DB_PATH)
-    con.execute("""CREATE TABLE IF NOT EXISTS prompts (
-        id        INTEGER PRIMARY KEY AUTOINCREMENT,
-        ts        TEXT NOT NULL,
-        user      TEXT NOT NULL,
-        ip        TEXT NOT NULL,
-        message   TEXT NOT NULL,
-        status    TEXT NOT NULL DEFAULT 'pending'
-    )""")
-    # Add status column to existing DBs that predate this change
-    try:
-        con.execute("ALTER TABLE prompts ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'")
-    except Exception:
-        pass
-    con.commit(); con.close()
+    if USE_PG:
+        con = _pg()
+        con.cursor().execute("""CREATE TABLE IF NOT EXISTS prompts (
+            id      SERIAL PRIMARY KEY,
+            ts      TEXT NOT NULL,
+            usr     TEXT NOT NULL,
+            ip      TEXT NOT NULL,
+            message TEXT NOT NULL,
+            status  TEXT NOT NULL DEFAULT 'pending'
+        )""")
+        con.commit(); con.close()
+    else:
+        con = sqlite3.connect(DB_PATH)
+        con.execute("""CREATE TABLE IF NOT EXISTS prompts (
+            id      INTEGER PRIMARY KEY AUTOINCREMENT,
+            ts      TEXT NOT NULL,
+            usr     TEXT NOT NULL,
+            ip      TEXT NOT NULL,
+            message TEXT NOT NULL,
+            status  TEXT NOT NULL DEFAULT 'pending'
+        )""")
+        try:
+            con.execute("ALTER TABLE prompts RENAME COLUMN user TO usr")
+        except Exception:
+            pass
+        con.commit(); con.close()
 
 init_db()
 
 def log_prompt(user, ip, message):
     """Insert a new row and return its id so status can be updated later."""
-    con = sqlite3.connect(DB_PATH)
-    cur = con.execute(
-        "INSERT INTO prompts (ts, user, ip, message, status) VALUES (?,?,?,?,?)",
-        (datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"), user, ip, message[:300], "pending"))
-    row_id = cur.lastrowid
-    con.commit(); con.close()
+    ts = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    if USE_PG:
+        con = _pg(); cur = con.cursor()
+        cur.execute("INSERT INTO prompts (ts, usr, ip, message, status) VALUES (%s,%s,%s,%s,%s) RETURNING id",
+                    (ts, user, ip, message[:300], "pending"))
+        row_id = cur.fetchone()[0]
+        con.commit(); con.close()
+    else:
+        con = sqlite3.connect(DB_PATH)
+        cur = con.execute("INSERT INTO prompts (ts, usr, ip, message, status) VALUES (?,?,?,?,?)",
+                          (ts, user, ip, message[:300], "pending"))
+        row_id = cur.lastrowid
+        con.commit(); con.close()
     return row_id
 
 def update_status(row_id, status):
-    con = sqlite3.connect(DB_PATH)
-    con.execute("UPDATE prompts SET status=? WHERE id=?", (status, row_id))
-    con.commit(); con.close()
+    if USE_PG:
+        con = _pg()
+        con.cursor().execute("UPDATE prompts SET status=%s WHERE id=%s", (status, row_id))
+        con.commit(); con.close()
+    else:
+        con = sqlite3.connect(DB_PATH)
+        con.execute("UPDATE prompts SET status=? WHERE id=?", (status, row_id))
+        con.commit(); con.close()
 
 
 def logged_in():
@@ -318,14 +352,22 @@ def admin():
             return render_template("admin.html", auth=False, error="Wrong password.")
     if not session.get("admin"):
         return render_template("admin.html", auth=False, error="")
-    con = sqlite3.connect(DB_PATH)
-    rows = con.execute(
-        "SELECT ts, user, ip, status, message FROM prompts ORDER BY id DESC LIMIT 500"
-    ).fetchall()
-    stats = con.execute(
-        "SELECT user, COUNT(*) as cnt FROM prompts GROUP BY user ORDER BY cnt DESC"
-    ).fetchall()
-    con.close()
+    if USE_PG:
+        con = _pg(); cur = con.cursor()
+        cur.execute("SELECT ts, usr, ip, status, message FROM prompts ORDER BY id DESC LIMIT 500")
+        rows = cur.fetchall()
+        cur.execute("SELECT usr, COUNT(*) as cnt FROM prompts GROUP BY usr ORDER BY cnt DESC")
+        stats = cur.fetchall()
+        con.close()
+    else:
+        con = sqlite3.connect(DB_PATH)
+        rows = con.execute(
+            "SELECT ts, usr, ip, status, message FROM prompts ORDER BY id DESC LIMIT 500"
+        ).fetchall()
+        stats = con.execute(
+            "SELECT usr, COUNT(*) as cnt FROM prompts GROUP BY usr ORDER BY cnt DESC"
+        ).fetchall()
+        con.close()
     return render_template("admin.html", auth=True, rows=rows, stats=stats)
 
 
