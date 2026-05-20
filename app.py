@@ -31,10 +31,13 @@ SCRIPTS_DIR = os.path.join(BASE_DIR, "scripts")
 READ_DOC_PY = os.path.join(SCRIPTS_DIR, "read_doc.py")
 
 DATABASE_URL = os.environ.get("DATABASE_URL")  # set automatically by Railway PostgreSQL
+# psycopg2 requires postgresql:// not postgres://
+if DATABASE_URL:
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 USE_PG = bool(DATABASE_URL and psycopg2)
 
 def _pg():
-    return psycopg2.connect(DATABASE_URL, sslmode="require")
+    return psycopg2.connect(DATABASE_URL)
 
 def init_db():
     if USE_PG:
@@ -428,7 +431,7 @@ def chat():
 
         for _ in range(10):
             response = client.messages.create(
-                model="claude-sonnet-4-6",
+                model="claude-haiku-4-5",
                 max_tokens=8192,
                 system=SYSTEM_PROMPT,
                 tools=TOOLS,
