@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Fibox Product Assistant</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     /* ── reset & base ─────────────────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -208,6 +209,32 @@
     }
     #attach-preview .attach-remove:hover { color: #c0392b; }
 
+    /* ── download bar ─────────────────────────────────────────────────────── */
+    #download-bar {
+      background: #fff;
+      border-top: 1px solid #D9E4EF;
+      padding: 8px 16px;
+      display: none;
+      align-items: center;
+      justify-content: flex-end;
+      flex-shrink: 0;
+    }
+    #download-btn {
+      background: #1a7a3c;
+      color: #fff;
+      border: none;
+      border-radius: 20px;
+      padding: 7px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: background .15s;
+    }
+    #download-btn:hover { background: #155f30; }
+
     /* ── input bar ────────────────────────────────────────────────────────── */
     .input-bar {
       background: #fff;
@@ -358,6 +385,11 @@
   <span class="attach-remove" onclick="clearAttachment()" title="Remove">×</span>
 </div>
 
+<!-- ── Download bar ────────────────────────────────────────────────────────── -->
+<div id="download-bar">
+  <button id="download-btn" onclick="downloadToExcel()">📥 Download to Excel</button>
+</div>
+
 <!-- ── Input bar ───────────────────────────────────────────────────────────── -->
 <input type="file" id="file-input" accept="image/*,application/pdf" style="display:none" />
 <div class="input-bar">
@@ -370,13 +402,15 @@
 </div>
 
 <script>
-  const chatEl    = document.getElementById('chat');
-  const inputEl   = document.getElementById('user-input');
-  const sendBtn   = document.getElementById('send-btn');
-  const suggsEl   = document.getElementById('suggestions');
-  const fileInput = document.getElementById('file-input');
-  const previewEl = document.getElementById('attach-preview');
-  let attachment  = null;   // {type, data (base64), media_type, name}
+  const chatEl      = document.getElementById('chat');
+  const inputEl     = document.getElementById('user-input');
+  const sendBtn     = document.getElementById('send-btn');
+  const suggsEl     = document.getElementById('suggestions');
+  const fileInput   = document.getElementById('file-input');
+  const previewEl   = document.getElementById('attach-preview');
+  const downloadBar = document.getElementById('download-bar');
+  let attachment    = null;   // {type, data (base64), media_type, name}
+  let lastAgentBubble = null; // tracks the most recent assistant bubble
 
   fileInput.addEventListener('change', () => {
     const file = fileInput.files[0];
@@ -448,6 +482,11 @@
     wrapper.appendChild(bubble);
     chatEl.appendChild(wrapper);
     chatEl.scrollTop = chatEl.scrollHeight;
+
+    if (!isUser) {
+      lastAgentBubble = bubble;
+      downloadBar.style.display = 'flex';
+    }
     return bubble;
   }
 
@@ -610,8 +649,39 @@
       .join('');
   }
 
+  function getCellValue(cell) {
+    const link = cell.querySelector('a[href]');
+    if (link) {
+      const href = link.getAttribute('href');
+      if (href && href.startsWith('http')) return href;
+    }
+    return cell.innerText.trim();
+  }
+
+  function downloadToExcel() {
+    if (!lastAgentBubble) return;
+    const tables = lastAgentBubble.querySelectorAll('table');
+    if (!tables.length) {
+      alert('No tables found in the last response.');
+      return;
+    }
+    let allData = [];
+    tables.forEach((table, idx) => {
+      if (idx > 0) allData.push([]); // blank row between tables
+      table.querySelectorAll('tr').forEach(row => {
+        allData.push(Array.from(row.querySelectorAll('th, td')).map(getCellValue));
+      });
+    });
+    const ws = XLSX.utils.aoa_to_sheet(allData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Results');
+    XLSX.writeFile(wb, 'fibox-results.xlsx');
+  }
+
   function resetChat() {
     history = [];
+    lastAgentBubble = null;
+    downloadBar.style.display = 'none';
     chatEl.innerHTML = `
       <div class="welcome" id="welcome-card">
         <img class="welcome-img" src="/static/fibox-products.jpg" alt="Fibox Enclosures" />
