@@ -431,7 +431,7 @@ def chat():
 
         for _ in range(10):
             response = client.messages.create(
-                model="claude-haiku-4-5",
+                model="claude-sonnet-4-6",
                 max_tokens=8192,
                 system=SYSTEM_PROMPT,
                 tools=TOOLS,
