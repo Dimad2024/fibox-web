@@ -245,7 +245,7 @@
       align-items: flex-end;
       flex-shrink: 0;
     }
-    #attach-btn {
+    #attach-btn, #mic-btn {
       width: 42px; height: 42px; border-radius: 50%;
       background: #F0F6FF; border: 1.5px solid #C5D9EE;
       cursor: pointer; flex-shrink: 0;
@@ -254,6 +254,15 @@
       color: #1F5C99; font-size: 18px;
     }
     #attach-btn:hover { background: #D9EEFF; }
+    #mic-btn:hover { background: #D9EEFF; }
+    #mic-btn.listening {
+      background: #FDE8E8; border-color: #e74c3c; color: #e74c3c;
+      animation: mic-pulse 1s infinite;
+    }
+    @keyframes mic-pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(231,76,60,.4); }
+      50%       { box-shadow: 0 0 0 7px rgba(231,76,60,0); }
+    }
     #user-input {
       flex: 1;
       border: 1.5px solid #C5D9EE;
@@ -394,6 +403,7 @@
 <input type="file" id="file-input" accept="image/*,application/pdf" style="display:none" />
 <div class="input-bar">
   <button id="attach-btn" onclick="document.getElementById('file-input').click()" title="Attach image or PDF">📎</button>
+  <button id="mic-btn" onclick="toggleMic()" title="Speak your question">🎤</button>
   <textarea id="user-input" rows="1"
     placeholder="Ask about enclosure sizes, products, or where to buy..."></textarea>
   <button id="send-btn" onclick="sendMessage()" title="Send">
@@ -696,6 +706,43 @@
   }
 
   renderSuggestions();
+
+  // ── Speech input ────────────────────────────────────────────────────────────
+  const micBtn = document.getElementById('mic-btn');
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let recognition = null;
+
+  if (!SpeechRecognition) {
+    micBtn.style.display = 'none'; // hide on unsupported browsers
+  } else {
+    recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onresult = (e) => {
+      const transcript = e.results[0][0].transcript;
+      inputEl.value = transcript;
+      inputEl.style.height = 'auto';
+      inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + 'px';
+      inputEl.focus();
+      micBtn.classList.remove('listening');
+    };
+
+    recognition.onerror  = () => micBtn.classList.remove('listening');
+    recognition.onend    = () => micBtn.classList.remove('listening');
+  }
+
+  function toggleMic() {
+    if (!recognition) return;
+    if (micBtn.classList.contains('listening')) {
+      recognition.stop();
+      micBtn.classList.remove('listening');
+    } else {
+      recognition.start();
+      micBtn.classList.add('listening');
+    }
+  }
 </script>
 </body>
 </html>
