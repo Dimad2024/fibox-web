@@ -41,16 +41,26 @@ def _pg():
 
 def init_db():
     if USE_PG:
-        con = _pg()
-        con.cursor().execute("""CREATE TABLE IF NOT EXISTS prompts (
-            id      SERIAL PRIMARY KEY,
-            ts      TEXT NOT NULL,
-            usr     TEXT NOT NULL,
-            ip      TEXT NOT NULL,
-            message TEXT NOT NULL,
-            status  TEXT NOT NULL DEFAULT 'pending'
-        )""")
-        con.commit(); con.close()
+        import time
+        for attempt in range(10):
+            try:
+                con = _pg()
+                cur = con.cursor()
+                cur.execute("""CREATE TABLE IF NOT EXISTS prompts (
+                    id      SERIAL PRIMARY KEY,
+                    ts      TEXT NOT NULL,
+                    usr     TEXT NOT NULL,
+                    ip      TEXT NOT NULL,
+                    message TEXT NOT NULL,
+                    status  TEXT NOT NULL DEFAULT 'pending'
+                )""")
+                con.commit(); con.close()
+                print(f"[DB] PostgreSQL ready (attempt {attempt+1})", flush=True)
+                return
+            except Exception as e:
+                print(f"[DB] init_db attempt {attempt+1} failed: {e}", flush=True)
+                time.sleep(2)
+        print("[DB] ERROR: could not initialise PostgreSQL after 10 attempts", flush=True)
     else:
         con = sqlite3.connect(DB_PATH)
         con.execute("""CREATE TABLE IF NOT EXISTS prompts (
