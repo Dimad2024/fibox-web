@@ -68,6 +68,7 @@ def init_db():
         con.commit(); con.close()
 
 init_db()
+print(f"[DB] USE_PG={USE_PG}  DATABASE_URL={'set' if DATABASE_URL else 'NOT SET'}", flush=True)
 
 def log_prompt(user, ip, message):
     """Insert a new row and return its id so status can be updated later."""
@@ -191,6 +192,45 @@ Fibox does not publish pricing. If asked: "Fibox does not publish pricing - pric
 
 ## Tone
 Professional, concise, helpful. Use markdown formatting."""
+
+# ── USA mode — used when prompt starts with $ ─────────────────────────────────
+USA_SYSTEM_PROMPT = """You are a Fibox USA product specialist. Your ONLY source of information is the live fiboxusa.com website.
+
+## Strict Rules
+- Use ONLY the scrape_product tool to fetch ALL information from fiboxusa.com
+- NEVER answer from training knowledge, PDFs, internal database, or any source other than fiboxusa.com
+- Show ONLY fiboxusa.com links — never fibox.com or any other domain
+- If a page returns no useful content, state: "This product or information is not listed on fiboxusa.com"
+
+## How to navigate fiboxusa.com
+Start with one of these entry points based on the query, then follow product links found in the scraped page:
+- Keyword / general search: https://www.fiboxusa.com/?s={search_terms_with_+_between_words}
+- All enclosures: https://www.fiboxusa.com/enclosures/
+- Specific product family pages you discover while scraping
+
+## Workflow for every query
+1. Choose the best starting URL on fiboxusa.com for the query
+2. Call scrape_product on that URL
+3. From the scraped content, identify 2–4 relevant product page links
+4. Call scrape_product on each relevant product page
+5. Answer based SOLELY on the scraped content — dimensions, specs, ratings, availability all come from fiboxusa.com
+
+## Tone
+Professional, concise, helpful. Use markdown formatting."""
+
+USA_TOOLS = [
+    {
+        "name": "scrape_product",
+        "description": "Fetch content from any fiboxusa.com page. Use this to search, browse categories, and retrieve product specifications. Always start with a relevant fiboxusa.com URL.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "url": {"type": "string", "description": "Full fiboxusa.com URL to fetch"}
+            },
+            "required": ["url"]
+        }
+    }
+]
 
 TOOLS = [
     {
@@ -400,6 +440,12 @@ def chat():
 
         ip     = request.headers.get("X-Forwarded-For", request.remote_addr).split(",")[0].strip()
         user   = session.get("user", "unknown")
+
+        # $ prefix → USA mode: use fiboxusa.com instead of fibox.com
+        use_usa = user_msg.startswith("$")
+        if use_usa:
+            user_msg = user_msg[1:].strip()
+
         row_id = log_prompt(user, ip, user_msg)
 
         messages = [{"role": t["role"], "content": t["content"]} for t in history]
@@ -429,12 +475,15 @@ def chat():
 
         messages.append({"role": "user", "content": user_content})
 
+        active_system = USA_SYSTEM_PROMPT if use_usa else SYSTEM_PROMPT
+        active_tools  = USA_TOOLS        if use_usa else TOOLS
+
         for _ in range(10):
             response = client.messages.create(
                 model="claude-sonnet-4-6",
                 max_tokens=8192,
-                system=SYSTEM_PROMPT,
-                tools=TOOLS,
+                system=active_system,
+                tools=active_tools,
                 messages=messages,
             )
 
