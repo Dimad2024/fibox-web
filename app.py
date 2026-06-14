@@ -488,6 +488,10 @@ def chat():
         active_system = USA_SYSTEM_PROMPT if use_usa else SYSTEM_PROMPT
         active_tools  = USA_TOOLS        if use_usa else TOOLS
 
+        language = data.get("language", "English")
+        if language and language != "English":
+            active_system = active_system + f"\n\nIMPORTANT: The user has selected {language} as their language. You MUST respond in {language} for all text you write."
+
         for _ in range(10):
             response = client.messages.create(
                 model="claude-sonnet-4-6",
