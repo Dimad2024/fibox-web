@@ -58,6 +58,8 @@ def search(ws, req):
     """Return sorted matches for the given (W, D, H) request tuple."""
     results = []
     for row in ws.iter_rows(min_row=DATA_START, values_only=True):
+        if str(row[COL_GROUP] or '').strip().upper() == 'NEO':
+            continue
         dims = parse_dim(row[COL_DIM])
         if dims is None:
             continue

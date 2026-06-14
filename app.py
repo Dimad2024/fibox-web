@@ -123,7 +123,6 @@ SYSTEM_PROMPT = """You are a Fibox product specialist assistant. Help customers 
 Fibox is a Finnish manufacturer of polycarbonate (PC), ABS, and GRP enclosures used in industrial, electrical, and outdoor applications.
 
 ## Product Families
-- NEO: Modern polycarbonate enclosures, IK10, IP66/67
 - ARCA: Classic wall-mount cabinets, PC or steel door
 - MNX: Compact polycarbonate enclosures
 - EURONORD: DIN-rail and wall-mount enclosures, PC/ABS/Polyester
@@ -171,13 +170,13 @@ When a customer asks for accessories for a specific enclosure (e.g. "accessories
 3. In the PDF text, locate the accessories section. Accessories list the enclosures they fit in a field called "for enclosures" or inside the "description". Find all accessories where the target enclosure symbol or size group is listed.
 
 **Step 2 — Enrich with master_web.xlsx:**
-4. Call `list_products_by_group` with the product family group of the enclosure (e.g. "ARCA" for ARCA products, "NEO" for NEO products, "TEMPO" for TEMPO products) and keyword "accessories". This returns all accessory rows for that family with their Dimensions, Pack, Weight, and Weblink. Match the symbols/codes found in step 1 against this list. Always use these values — never leave Dimensions, Pack, or Weight blank if the xlsx has them.
+4. Call `list_products_by_group` with the product family group of the enclosure (e.g. "ARCA" for ARCA products, "TEMPO" for TEMPO products, "MNX" for MNX products) and keyword "accessories". This returns all accessory rows for that family with their Dimensions, Pack, Weight, and Weblink. Match the symbols/codes found in step 1 against this list. Always use these values — never leave Dimensions, Pack, or Weight blank if the xlsx has them.
 
 **Step 3 — Present the results:**
-Present the combined data as a table with EXACTLY these columns: Symbol | Code | Dimensions | Description | Pack | Weight (kg) | Product Link
+Present the combined data as a table with EXACTLY these columns: Symbol | Code | Dimensions | Description | Pack | Weight (kg)
+- Do NOT include a Product Link column for accessories.
 - Do NOT create custom column headings such as "Accessory Code".
 - Group accessories by category (e.g. Mounting Plates, DIN Rail, Door Accessories) using bold subheadings, sourced from the PDF structure.
-- If Weblink is blank, use: https://www.fibox.com/products
 - If Dimensions is blank, leave the cell empty.
 
 ## Presenting Group Listings (list_products_by_group tool — non-accessory use)
@@ -287,7 +286,7 @@ TOOLS = [
             "properties": {
                 "group": {
                     "type": "string",
-                    "description": "Product group name such as ARCA, MNX, EURONORD, TEMPO, NEO, SOLID, CAB, EK, PICCOLO, MCE"
+                    "description": "Product group name such as ARCA, MNX, EURONORD, TEMPO, SOLID, CAB, EK, PICCOLO, MCE"
                 },
                 "category_keyword": {
                     "type": "string",

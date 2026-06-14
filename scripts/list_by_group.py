@@ -45,6 +45,8 @@ def load_rows(group_filter, category_filter=''):
 
     for row in ws.iter_rows(min_row=DATA_START, values_only=True):
         row_group = str(row[COL_GROUP] or '').upper()
+        if row_group == 'NEO':
+            continue
         if row_group != group_upper:
             continue
 
