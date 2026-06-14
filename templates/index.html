@@ -403,9 +403,8 @@
   <div class="welcome" id="welcome-card">
     <img class="welcome-img" src="/static/fibox-products.jpg" alt="Fibox enclosures" />
     <div class="welcome-body">
-      <h2>Welcome to the Fibox Product Assistant</h2>
-      <p>I can help you find the right enclosure by size, provide product links,
-         packaging details, and tell you where to buy Fibox products in your country.</p>
+      <h2 id="welcome-title">Welcome to the Fibox Product Assistant</h2>
+      <p id="welcome-desc">I can help you find the right enclosure by size, provide product links, packaging details, explain Fibox product benefits, and tell you where to buy Fibox products in your country.</p>
     </div>
   </div>
 </div>
@@ -654,9 +653,29 @@
 
   const LANG_CODES = { en:'en-US', fi:'fi-FI', de:'de-DE', et:'et-EE', lv:'lv-LV', lt:'lt-LT' };
 
+  const WELCOME = {
+    en: { title: 'Welcome to the Fibox Product Assistant',
+          desc:  'I can help you find the right enclosure by size, provide product links, packaging details, explain Fibox product benefits, and tell you where to buy Fibox products in your country.' },
+    fi: { title: 'Tervetuloa Fibox-tuoteassistentin',
+          desc:  'Voin auttaa sinua löytämään oikean kotelon koon mukaan, tarjota tuotelinkkejä, pakkaustietoja, selittää Fiboxin tuotteiden hyödyt ja kertoa, mistä voit ostaa Fiboxin tuotteita maassasi.' },
+    de: { title: 'Willkommen beim Fibox Produktassistenten',
+          desc:  'Ich helfe Ihnen, das richtige Gehäuse nach Größe zu finden, Produktlinks und Verpackungsdetails bereitzustellen, die Vorteile von Fibox-Produkten zu erklären und Ihnen zu sagen, wo Sie Fibox-Produkte in Ihrem Land kaufen können.' },
+    et: { title: 'Tere tulemast Fiboxi tooteassistendi juurde',
+          desc:  'Saan aidata teil leida õige karbiku suuruse järgi, pakkuda tootelinke, pakendamisandmeid, selgitada Fiboxi toodete eeliseid ja öelda, kust saate Fiboxi tooteid oma riigis osta.' },
+    lv: { title: 'Laipni lūdzam Fibox produktu asistentā',
+          desc:  'Es varu palīdzēt jums atrast pareizo korpusu pēc izmēra, sniegt produktu saites, iepakojuma informāciju, izskaidrot Fibox produktu priekšrocības un pastāstīt, kur jūsu valstī iegādāties Fibox produktus.' },
+    lt: { title: 'Sveiki atvykę į Fibox produktų asistentą',
+          desc:  'Galiu padėti jums rasti tinkamą dėžutę pagal dydį, pateikti produktų nuorodas, pakavimo informaciją, paaiškinti Fibox produktų privalumus ir papasakoti, kur jūsų šalyje įsigyti Fibox produktų.' },
+  };
+
   function setLanguage(lang) {
     currentLang = lang;
     if (recognition) recognition.lang = LANG_CODES[lang];
+    const w = WELCOME[lang];
+    const t = document.getElementById('welcome-title');
+    const d = document.getElementById('welcome-desc');
+    if (t) t.textContent = w.title;
+    if (d) d.textContent = w.desc;
     renderSuggestions();
   }
 
@@ -706,9 +725,8 @@
       <div class="welcome" id="welcome-card">
         <img class="welcome-img" src="/static/fibox-products.jpg" alt="Fibox Enclosures" />
         <div class="welcome-body">
-          <h2>Welcome to the Fibox Product Assistant</h2>
-          <p>I can help you find the right enclosure by size, provide product links,
-             packaging details, and tell you where to buy Fibox products in your country.</p>
+          <h2 id="welcome-title">Welcome to the Fibox Product Assistant</h2>
+          <p id="welcome-desc">I can help you find the right enclosure by size, provide product links, packaging details, explain Fibox product benefits, and tell you where to buy Fibox products in your country.</p>
         </div>
       </div>`;
     suggsEl.style.display = '';
