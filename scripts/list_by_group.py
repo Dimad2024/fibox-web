@@ -48,9 +48,10 @@ def load_rows(group_filter, category_filter=''):
         if row_group != group_upper:
             continue
 
-        # Skip accessory rows only when NOT explicitly querying the ACCE group
+        # Skip accessory rows unless caller explicitly wants accessories
         cat = str(row[COL_CAT] or '').upper()
-        if 'ACCESSOR' in cat and group_upper != 'ACCE':
+        want_accessories = 'ACCESSOR' in category_filter.upper()
+        if 'ACCESSOR' in cat and not want_accessories:
             continue
 
         # Apply optional keyword filter

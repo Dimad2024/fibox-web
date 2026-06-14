@@ -171,7 +171,7 @@ When a customer asks for accessories for a specific enclosure (e.g. "accessories
 3. In the PDF text, locate the accessories section. Accessories list the enclosures they fit in a field called "for enclosures" or inside the "description". Find all accessories where the target enclosure symbol or size group is listed.
 
 **Step 2 — Enrich with master_web.xlsx:**
-4. Call `list_products_by_group` with group "ACCE" (no keyword, to retrieve all accessories). Match the accessory symbols/codes found in step 1 against the returned list to obtain Dimensions, Pack, Weight, and Weblink. Always use these values from the xlsx — never leave them blank if the xlsx has them.
+4. Call `list_products_by_group` with the product family group of the enclosure (e.g. "ARCA" for ARCA products, "NEO" for NEO products, "TEMPO" for TEMPO products) and keyword "accessories". This returns all accessory rows for that family with their Dimensions, Pack, Weight, and Weblink. Match the symbols/codes found in step 1 against this list. Always use these values — never leave Dimensions, Pack, or Weight blank if the xlsx has them.
 
 **Step 3 — Present the results:**
 Present the combined data as a table with EXACTLY these columns: Symbol | Code | Dimensions | Description | Pack | Weight (kg) | Product Link
