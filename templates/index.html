@@ -393,6 +393,8 @@
       <option value="et">Eesti</option>
       <option value="lv">Latviešu</option>
       <option value="lt">Lietuvių</option>
+      <option value="ja">日本語</option>
+      <option value="pl">Polski</option>
     </select>
     <div class="header-badge">🟢 Online</div>
   </div>
@@ -622,7 +624,7 @@
 
   // ── Language & sample prompts ───────────────────────────────────────────────
   let currentLang = 'en';
-  const LANG_NAMES = { en:'English', fi:'Finnish', de:'German', et:'Estonian', lv:'Latvian', lt:'Lithuanian' };
+  const LANG_NAMES = { en:'English', fi:'Finnish', de:'German', et:'Estonian', lv:'Latvian', lt:'Lithuanian', ja:'Japanese', pl:'Polish' };
 
   const PROMPTS = {
     en: {
@@ -648,10 +650,18 @@
     lt: {
       first: ['Man reikia dėžutės 400×300×150','Rasti dėžutę 300×250×100','Ieškau kažko apie 200×200×100','Rasti dėžutę 500×400×210','Man reikia plokščios dėžutės, apie 300×200×80','Kažkas artimo 150×150×100','Rasti dėžutę apie 600×400×210','Man reikia didelės dėžutės 700×500×300'],
       other: ['Rodyti ARCA IEC asortimentą','Rodyti NEO polikarbonato asortimentą','Rodyti MNX kompaktišką asortimentą','Rodyti EURONORD asortimentą','Rodyti TEMPO lengvąjį asortimentą','Rodyti SOLID GRP asortimentą','Išvardinti CAB ABS dėžutes','Rodyti PICCOLO miniatiūrinį asortimentą','Rodyti ARCA dėžutes su lango dangčiu','Rodyti ARCA dėžutes su svirtine rankena','Išvardinti ARCA dėžutes be montavimo plokštės','Palyginti ARCA ir SOLID dėžutes','Palyginti MNX ir EURONORD DIN bėgelių naudojimui','NEO vs MNX — kuri geriau tinka lauko sąlygoms?','ARCA privalumai prieš metalinius spintelus','Polikarbonatas vs ABS — koks skirtumas?','Kokie polikarbonato privalumai prieš metalą?','Kada rinktis GRP vietoj polikarbonato?','Kas geriau lauko naudojimui — NEO ar SOLID?','Kuri dėžutė geriausia korozinėms aplinkoms?','Kuri Fibox dėžutė yra atspariausiai smūgiams?','Kokia IP apsaugos klasė yra NEO?','Ką reiškia IK10 smūgio atspario klasė?','Kurios dėžutės yra atsparios UV?','Ar Fibox dėžutės yra be halogenų?','Kokį temperatūros diapazoną palaiko Fibox dėžutės?','Kurios dėžutės turi skaidraus dangčio variantą?','Kokia tarpinių medžiaga naudojama MNX dėžutėse?','Kurios dėžutės yra UL sertifikuotos?','Kokie montavimo priedai prieinami NEO?','Ar Fibox dėžutės palaiko DIN bėgelių montavimą?','Geriausia dėžutė lauko elektros skydelui','Dėžutė Raspberry Pi projektui','Dėžutė pramoniniam valdymo spintui','Tinkama dėžutė maisto pramonės naudojimui','Kokia dėžutė tinka jūrinei / pakrantės aplinkai?','Kur pirkti Fibox Vokietijoje?','Kur pirkti Fibox Lenkijoje?','Kur pirkti Fibox Jungtinėje Karalystėje?','Kur pirkti Fibox Prancūzijoje?','Kas yra Fibox platintojai Skandinavijoje?']
+    },
+    ja: {
+      first: ['400×300×150のエンクロージャが必要','300×250×100のエンクロージャを探す','200×200×100前後のものを探している','500×400×210のエンクロージャを探す','約300×200×80の薄型ボックスが必要','150×150×100に近いサイズ','約600×400×210のエンクロージャを探す','700×500×300の大型エンクロージャが必要'],
+      other: ['ARCA IECシリーズを表示','NEOポリカーボネートシリーズを表示','MNXコンパクトシリーズを表示','EURONORDシリーズを表示','TEMPOライトウェイトシリーズを表示','SOLID GRPシリーズを表示','CAB ABSエンクロージャを一覧表示','PICCOLOミニチュアシリーズを表示','ウィンドウカバー付きARCAキャビネットを表示','スイングハンドル付きARCAキャビネットを表示','取付プレートなしARCAキャビネットを一覧表示','ARCAとSOLIDを比較','DINレール用途でMNXとEURONORDを比較','NEO対MNX — 屋外用途にはどちらが適切？','ARCAの金属キャビネットに対する利点','ポリカーボネート対ABS — 違いは何か？','ポリカーボネートの金属に対する利点は？','GRPをポリカーボネートの代わりに選ぶべき場合は？','屋外用途にはNEOとSOLIDのどちらが良いか？','腐食環境に最適なエンクロージャは？','最も耐衝撃性の高いFiboxエンクロージャは？','NEOのIP保護等級は？','IK10耐衝撃等級とは何を意味するか？','UV耐性を持つエンクロージャは？','Fiboxエンクロージャはハロゲンフリーか？','Fiboxエンクロージャの使用温度範囲は？','透明カバーオプションのあるエンクロージャは？','MNXエンクロージャのガスケット材質は？','UL認証を持つエンクロージャは？','NEO用の取付アクセサリは？','FiboxエンクロージャはDINレール取付をサポートするか？','屋外電気パネル用の最適エンクロージャ','Raspberry Piプロジェクト用エンクロージャ','産業用制御盤用エンクロージャ','食品産業用途に適したエンクロージャ','海洋・沿岸環境に適したエンクロージャは？','ドイツでFiboxを購入するには？','ポーランドでFiboxを購入するには？','イギリスでFiboxを購入するには？','フランスでFiboxを購入するには？','スカンジナビアのFibox販売代理店は？']
+    },
+    pl: {
+      first: ['Potrzebuję obudowy 400×300×150','Znajdź obudowę 300×250×100','Szukam czegoś około 200×200×100','Znajdź obudowę 500×400×210','Potrzebuję płytkiej obudowy, około 300×200×80','Coś zbliżonego do 150×150×100','Znajdź obudowę około 600×400×210','Potrzebuję dużej obudowy 700×500×300'],
+      other: ['Pokaż serię ARCA IEC','Pokaż serię NEO z poliwęglanu','Pokaż kompaktową serię MNX','Pokaż serię EURONORD','Pokaż lekką serię TEMPO','Pokaż serię SOLID GRP','Wylistuj obudowy CAB ABS','Pokaż miniaturową serię PICCOLO','Pokaż szafy ARCA z okienkiem','Pokaż szafy ARCA z zamkiem obrotowym','Wylistuj szafy ARCA bez płyty montażowej','Porównaj ARCA i SOLID','Porównaj MNX i EURONORD do zastosowań z szyną DIN','NEO vs MNX — które lepsze do zastosowań zewnętrznych?','Zalety ARCA w porównaniu do metalowych szaf','Poliwęglan vs ABS — jaka jest różnica?','Jakie są zalety poliwęglanu w porównaniu do metalu?','Kiedy wybrać GRP zamiast poliwęglanu?','Co lepsze na zewnątrz — NEO czy SOLID?','Która obudowa najlepsza do środowisk korozyjnych?','Która obudowa Fibox jest najbardziej odporna na uderzenia?','Jaki stopień ochrony IP ma NEO?','Co oznacza klasa odporności na uderzenia IK10?','Które obudowy są odporne na UV?','Czy obudowy Fibox są bezhalogenowe?','Jaki zakres temperatur obsługują obudowy Fibox?','Które obudowy mają opcję przezroczystej pokrywy?','Jaki materiał uszczelki stosowany jest w MNX?','Które obudowy mają certyfikat UL?','Jakie akcesoria montażowe są dostępne dla NEO?','Czy obudowy Fibox obsługują montaż na szynie DIN?','Najlepsza obudowa do zewnętrznego rozdzielacza elektrycznego','Obudowa do projektu Raspberry Pi','Obudowa do przemysłowego panelu sterowania','Odpowiednia obudowa do zastosowań w przemyśle spożywczym','Jaka obudowa do środowiska morskiego / przybrzeżnego?','Gdzie kupić Fibox w Niemczech?','Gdzie kupić Fibox w Polsce?','Gdzie kupić Fibox w Wielkiej Brytanii?','Gdzie kupić Fibox we Francji?','Kto jest dystrybutorem Fibox w Skandynawii?']
     }
   };
 
-  const LANG_CODES = { en:'en-US', fi:'fi-FI', de:'de-DE', et:'et-EE', lv:'lv-LV', lt:'lt-LT' };
+  const LANG_CODES = { en:'en-US', fi:'fi-FI', de:'de-DE', et:'et-EE', lv:'lv-LV', lt:'lt-LT', ja:'ja-JP', pl:'pl-PL' };
 
   const WELCOME = {
     en: { title: 'Welcome to the Fibox Product Assistant',
@@ -666,6 +676,10 @@
           desc:  'Es varu palīdzēt jums atrast pareizo korpusu pēc izmēra, sniegt produktu saites, iepakojuma informāciju, izskaidrot Fibox produktu priekšrocības un pastāstīt, kur jūsu valstī iegādāties Fibox produktus.' },
     lt: { title: 'Sveiki atvykę į Fibox produktų asistentą',
           desc:  'Galiu padėti jums rasti tinkamą dėžutę pagal dydį, pateikti produktų nuorodas, pakavimo informaciją, paaiškinti Fibox produktų privalumus ir papasakoti, kur jūsų šalyje įsigyti Fibox produktų.' },
+    ja: { title: 'Fibox製品アシスタントへようこそ',
+          desc:  'サイズに合ったエンクロージャの検索、製品リンクや梱包詳細の提供、Fibox製品のメリットの説明、そしてお住まいの国でFibox製品を購入できる場所のご案内が可能です。' },
+    pl: { title: 'Witamy w Asystencie Produktowym Fibox',
+          desc:  'Mogę pomóc znaleźć odpowiednią obudowę według rozmiaru, podać linki do produktów, szczegóły pakowania, wyjaśnić zalety produktów Fibox oraz powiedzieć, gdzie kupić produkty Fibox w Twoim kraju.' },
   };
 
   function setLanguage(lang) {
