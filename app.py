@@ -161,6 +161,12 @@ Present both lists as separate tables with columns: Symbol | Code | Dimensions |
 After both tables, add a **Best Options** summary section. Pick the top 3–5 candidates across both lists based on closest volume match and practical fit. Format as a short bulleted list, each bullet including: Symbol, Code in backticks, dimensions, and one sentence on why it stands out (e.g. closest match, most compact, standard series, swapped orientation). Example format:
 - **ARCA 302015** `8120002` — 300×200×150 mm — exact match, standard ARCA IEC cabinet with mounting plate.
 
+## Presenting Accessories and Group Listings (list_products_by_group tool)
+Present ALL products returned by list_products_by_group — including accessories (ACCE), cable glands, and any other group — as a table with EXACTLY these columns: Symbol | Code | Dimensions | Description | Pack | Weight (kg) | Product Link
+- Do NOT create custom column headings such as "Accessory Code" or rename columns.
+- If Weblink is blank, use: https://www.fibox.com/products
+- If Dimensions is blank, leave the cell empty.
+
 ## Presenting Contacts (get_contacts tool)
 The tool returns `sales` (list of persons) and `distributors` (list of companies).
 
