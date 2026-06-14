@@ -37,7 +37,7 @@ def row_matches_keyword(row, keyword):
 
 
 def load_rows(group_filter, category_filter=''):
-    """Load rows matching group, skipping accessories, optionally filtered by keyword."""
+    """Load rows matching group, optionally filtered by keyword."""
     group_upper = group_filter.upper()
     wb = openpyxl.load_workbook(DATA_FILE, data_only=True, read_only=True)
     ws = wb['PRODUCTS']
@@ -48,9 +48,9 @@ def load_rows(group_filter, category_filter=''):
         if row_group != group_upper:
             continue
 
-        # Skip accessory rows (category contains 'ACCESSOR')
+        # Skip accessory rows only when NOT explicitly querying the ACCE group
         cat = str(row[COL_CAT] or '').upper()
-        if 'ACCESSOR' in cat:
+        if 'ACCESSOR' in cat and group_upper != 'ACCE':
             continue
 
         # Apply optional keyword filter
