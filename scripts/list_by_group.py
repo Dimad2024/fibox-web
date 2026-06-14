@@ -69,7 +69,7 @@ def load_rows(group_filter, category_filter=''):
             'pack_unit'  : row[COL_PACK],
             'dim_str'    : str(row[COL_DIM] or ''),
             'weight_kg'  : row[COL_WEIGHT],
-            'weblink'    : str(row[COL_URL] or ''),
+            'weblink'    : (str(row[COL_URL]) if row[COL_URL] and str(row[COL_URL]).strip() not in ('', '-', 'None') else ''),
         })
 
     wb.close()

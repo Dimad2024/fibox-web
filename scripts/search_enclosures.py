@@ -82,7 +82,7 @@ def search(ws, req):
                 'dim_str'    : str(row[COL_DIM]),
                 'pack_unit'  : row[COL_PACK],
                 'weight_kg'  : row[COL_WEIGHT],
-                'weblink'    : str(row[COL_URL] or ''),
+                'weblink'    : (str(row[COL_URL]) if row[COL_URL] and str(row[COL_URL]).strip() not in ('', '-', 'None') else ''),
                 'vol_diff'   : vd,
                 'exact_dims' : exact,
                 '_sort'      : (mce, -exact, vd),
