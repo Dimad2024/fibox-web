@@ -13,8 +13,9 @@ app.secret_key = os.environ.get("FLASK_SECRET", "fibox-secret-key-change-in-prod
 
 # ── Per-user passwords ────────────────────────────────────────────────────────
 # USERS env var accepts two formats:
-#   Simple (recommended): user1:pass1,user2:pass2,user3:pass3
-#   JSON (legacy):        {"user1":"pass1","user2":"pass2"}
+#   Simple: user1:pass1,user2:pass2
+#   JSON:   {"user1":"pass1","user2":"pass2"}
+# Individual users can also be added via USER_<name>=<password> env vars.
 _users_env = os.environ.get("USERS")
 if _users_env:
     _users_env = _users_env.strip()
@@ -24,6 +25,11 @@ if _users_env:
         USERS = dict(pair.split(":", 1) for pair in _users_env.split(",") if ":" in pair)
 else:
     USERS = {"default": os.environ.get("APP_PASSWORD", "Fibox_agent")}
+
+# Merge any USER_<name>=<password> individual variables
+for _k, _v in os.environ.items():
+    if _k.startswith("USER_") and _v:
+        USERS[_k[5:].lower()] = _v
 
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "Fibox_admin")
 

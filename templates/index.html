@@ -70,6 +70,20 @@
       font-family: inherit;
     }
     #lang-select option { background: #1F5C99; color: #fff; }
+    .logout-btn {
+      background: rgba(255,255,255,.12);
+      border: 1px solid rgba(255,255,255,.3);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 11px;
+      color: #fff;
+      cursor: pointer;
+      text-decoration: none;
+      font-family: inherit;
+      transition: background .15s;
+      white-space: nowrap;
+    }
+    .logout-btn:hover { background: rgba(255,255,255,.25); }
     .header-badge {
       background: rgba(255,255,255,.15);
       border: 1px solid rgba(255,255,255,.3);
@@ -397,6 +411,7 @@
       <option value="pl">Polski</option>
     </select>
     <div class="header-badge">🟢 Online</div>
+    <a href="/logout" class="logout-btn">⏻ Log out</a>
   </div>
 </header>
 
