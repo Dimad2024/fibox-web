@@ -12,11 +12,16 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET", "fibox-secret-key-change-in-prod")
 
 # ── Per-user passwords ────────────────────────────────────────────────────────
-# Set via env var as JSON: USERS='{"tester1":"pass1","tester2":"pass2"}'
-# Falls back to single APP_PASSWORD mapped to user "default"
+# USERS env var accepts two formats:
+#   Simple (recommended): user1:pass1,user2:pass2,user3:pass3
+#   JSON (legacy):        {"user1":"pass1","user2":"pass2"}
 _users_env = os.environ.get("USERS")
 if _users_env:
-    USERS = json.loads(_users_env)
+    _users_env = _users_env.strip()
+    if _users_env.startswith("{"):
+        USERS = json.loads(_users_env)
+    else:
+        USERS = dict(pair.split(":", 1) for pair in _users_env.split(",") if ":" in pair)
 else:
     USERS = {"default": os.environ.get("APP_PASSWORD", "Fibox_agent")}
 
