@@ -536,6 +536,7 @@ def chat():
         if language and language != "English":
             active_system = active_system + f"\n\nIMPORTANT: The user has selected {language} as their language. You MUST respond in {language} for all text you write."
 
+
         for _ in range(10):
             response = client.messages.create(
                 model="claude-sonnet-4-6",
