@@ -200,10 +200,12 @@ Present the combined data as a table with EXACTLY these columns: Symbol | Code |
 - Do NOT create custom column headings such as "Accessory Code".
 - Group accessories by category (e.g. Mounting Plates, DIN Rail, Door Accessories) using bold subheadings, sourced from the PDF structure.
 - If Dimensions is blank, leave the cell empty.
+- After all enclosure-specific accessories, if there are general accessories to show, add a bold heading: **General Accessories** before that table.
 
 ## Presenting Group Listings (list_products_by_group tool)
 When listing any product family or group — including CABLE GLANDS and GENERAL ACCESSORIES — present results as a table with EXACTLY these columns: Symbol | Code | Dimensions | Description | Pack | Weight (kg) | Product Link
 - Product Link: show the full URL as a clickable link. If Weblink is blank, use: https://www.fibox.com/products
+- When listing GENERAL ACCESSORIES, always precede the table with the bold heading: **General Accessories**
 
 ## Presenting Contacts (get_contacts tool)
 The tool returns `sales` (list of persons) and `distributors` (list of companies).
