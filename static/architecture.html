@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<title>Fibox Agent — Architecture</title>
+<style>
+  body {
+    font-family: "SF Mono", "Fira Mono", "Menlo", monospace;
+    background: #fff;
+    color: #1A1A2E;
+    padding: 40px;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  pre {
+    white-space: pre;
+    font-family: inherit;
+  }
+</style>
+</head>
+<body>
+<pre>
+┌─────────────────────────────────────────────────────────────────────┐
+│                         RAILWAY CLOUD                               │
+│                                                                     │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │                     Flask App  (app.py)                     │   │
+│  │                                                             │   │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐  │   │
+│  │  │   /login     │  │    /chat     │  │     /admin       │  │   │
+│  │  │  session     │  │   (POST)     │  │    dashboard     │  │   │
+│  │  │  per-user    │  │              │  │                  │  │   │
+│  │  │  passwords   │  │ log prompt   │  │ prompts / IPs /  │  │   │
+│  │  └──────────────┘  │ update status│  │ users / status   │  │   │
+│  │                    └──────┬───────┘  └────────┬─────────┘  │   │
+│  │                           │                   │            │   │
+│  │                           ▼                   ▼            │   │
+│  │              ┌────────────────────┐  ┌────────────────┐    │   │
+│  │              │   Anthropic API    │  │   usage.db     │    │   │
+│  │              │  claude-sonnet-4-6 │  │   (SQLite)     │    │   │
+│  │              │                   │  └────────────────┘    │   │
+│  │              │  tool_use loop    │                         │   │
+│  │              └────────┬──────────┘                         │   │
+│  │                       │                                     │   │
+│  │            ┌──────────┼──────────────┐                     │   │
+│  │            ▼          ▼              ▼                      │   │
+│  │  ┌──────────────┐ ┌──────────────┐ ┌──────────────────┐    │   │
+│  │  │search_enclo- │ │list_by_group │ │  scrape_fibox.py │    │   │
+│  │  │sures.py      │ │.py           │ │  (fibox.com live)│    │   │
+│  │  └──────┬───────┘ └──────┬───────┘ └──────────────────┘    │   │
+│  │         │                │                                   │   │
+│  │         ▼                ▼                                   │   │
+│  │  ┌──────────────┐ ┌──────────────┐ ┌──────────────────┐    │   │
+│  │  │lookup_by_    │ │contacts_     │ │  read_doc.py     │    │   │
+│  │  │code.py       │ │lookup.py     │ │  (PDF brochures) │    │   │
+│  │  └──────────────┘ └──────┬───────┘ └──────┬───────────┘    │   │
+│  │                           │                │                │   │
+│  │  ┌────────────────┐       ▼                ▼                │   │
+│  │  │ master_web     │ ┌──────────────┐ ┌──────────────────┐  │   │
+│  │  │ .xlsx          │ │contacts.json │ │ docs/            │  │   │
+│  │  │ (~1500 prod.)  │ │(77 countries)│ │ *.pdf (3 files)  │  │   │
+│  │  └────────────────┘ └──────────────┘ └──────────────────┘  │   │
+│  │                                                             │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                                                                     │
+│  ENV VARS: ANTHROPIC_API_KEY · USERS · ADMIN_PASSWORD · FLASK_SECRET│
+└─────────────────────────────────────────────────────────────────────┘
+           ▲                              ▲
+           │                              │
+┌──────────────────┐            ┌──────────────────┐
+│  Tester Browser  │            │  Admin Browser   │
+│  login → chat    │            │  /admin dashboard│
+│  image / PDF     │            │  (Fibox_admin)   │
+│  upload          │            └──────────────────┘
+│  (tester1/2/3)   │
+└──────────────────┘
+
+
+────────────────────────────────────────────────────────────
+  Data flow for a single prompt
+────────────────────────────────────────────────────────────
+
+Tester types message  (or attaches image / PDF)
+         |
+         ▼
+Flask /chat  ──►  log to usage.db (status=pending)
+         |
+         ▼
+Claude API  ──►  decides which tool to call
+         |
+         ├──►  search_enclosures.py  ──►  master_web.xlsx
+         ├──►  list_by_group.py      ──►  master_web.xlsx
+         ├──►  lookup_by_code.py     ──►  master_web.xlsx
+         ├──►  scrape_fibox.py       ──►  fibox.com (HTTP)
+         ├──►  contacts_lookup.py    ──►  contacts.json
+         └──►  read_doc.py           ──►  docs/*.pdf
+         |
+         ▼
+Claude generates final response
+(ARCA responses: append ARCA T promo footer)
+         |
+         ▼
+Flask  ──►  update usage.db (status=success/failed)
+         |
+         ▼
+Browser renders markdown response
+</pre>
+</body>
+</html>
