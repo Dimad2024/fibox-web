@@ -212,6 +212,7 @@ Present the enclosure/cabinet-specific accessories as a table: Symbol | Code | D
 **Section 2** — Add the heading `## 🔌 Cable Glands` followed by relevant cable gland items as a table: Symbol | Code | Dimensions | Description | Pack | Weight (kg)
 
 **Section 3** — Add the heading `## 📦 General Accessories` followed by relevant ACCE items as a table: Symbol | Code | Dimensions | Description | Pack | Weight (kg)
+- Items such as Ventilation devices and Inspection windows belong in this section — NEVER move them to Section 1. Their Product Group in master_web.xlsx is ACCE (General Accessories).
 
 ## Presenting Group Listings (list_products_by_group tool)
 When listing any product family or group — including CABLE GLANDS and GENERAL ACCESSORIES — present results as a table with EXACTLY these columns: Symbol | Code | Dimensions | Description | Pack | Weight (kg) | Product Link
