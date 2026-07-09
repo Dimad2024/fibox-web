@@ -181,26 +181,20 @@
     .collapsible-header {
       cursor: pointer;
       user-select: none;
-      display: flex;
-      align-items: center;
-      gap: 6px;
     }
     .collapsible-header::after {
-      content: '▲';
+      content: ' ▼';
       font-size: 11px;
       color: #6B90B8;
-      margin-left: 4px;
       transition: transform .2s;
+      display: inline-block;
     }
-    .collapsible-header.collapsed::after {
+    .collapsible-header.open::after {
       transform: rotate(180deg);
     }
     .collapsible-body {
       overflow: hidden;
-      transition: max-height .25s ease;
-    }
-    .collapsible-body.collapsed {
-      max-height: 0 !important;
+      transition: max-height .3s ease;
     }
     .bubble pre {
       background: #F0F4FA; padding: 10px 12px;
@@ -659,16 +653,40 @@
   }
 
   // Make specific sections collapsible in an agent bubble
-  const COLLAPSIBLE_H2 = [/cable\s*gland/i, /general\s*accessor/i];
+  const COLLAPSIBLE_H2     = [/cable\s*gland/i, /general\s*accessor/i];
   const COLLAPSIBLE_STRONG = [/cover\s*screw/i];
+
+  function wireCollapsible(header, body) {
+    // Collapse immediately without animation
+    body.style.transition = 'none';
+    body.style.maxHeight  = '0px';
+    header.classList.add('collapsible-header');
+
+    // Re-enable transitions after browser paints the collapsed state
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      body.style.transition = '';
+    }));
+
+    header.addEventListener('click', () => {
+      const isOpen = header.classList.contains('open');
+      if (isOpen) {
+        // Collapse: fix height first, then animate to 0
+        body.style.maxHeight = body.scrollHeight + 'px';
+        requestAnimationFrame(() => { body.style.maxHeight = '0px'; });
+        header.classList.remove('open');
+      } else {
+        // Expand to a safe large value; content stops at natural height
+        body.style.maxHeight = '4000px';
+        header.classList.add('open');
+      }
+    });
+  }
 
   function makeCollapsible(bubble) {
     // ── H2-level collapsibles (Cable Glands, General Accessories) ──────────
     bubble.querySelectorAll('h2').forEach(h2 => {
-      const text = h2.textContent || '';
-      if (!COLLAPSIBLE_H2.some(re => re.test(text))) return;
+      if (!COLLAPSIBLE_H2.some(re => re.test(h2.textContent))) return;
 
-      // Gather all siblings until the next H2 or end
       const siblings = [];
       let node = h2.nextSibling;
       while (node && !(node.nodeType === 1 && node.tagName === 'H2')) {
@@ -678,42 +696,25 @@
       if (!siblings.length) return;
 
       const body = document.createElement('div');
-      body.className = 'collapsible-body collapsed';
+      body.className = 'collapsible-body';
       siblings.forEach(s => body.appendChild(s));
       h2.after(body);
-      // Measure natural height then collapse
-      body.style.maxHeight = body.scrollHeight + 'px';
-      requestAnimationFrame(() => { body.classList.add('collapsed'); body.style.maxHeight = '0'; });
 
-      h2.classList.add('collapsible-header', 'collapsed');
-      h2.addEventListener('click', () => {
-        const open = h2.classList.toggle('collapsed');
-        if (!open) {
-          // expanding
-          h2.classList.remove('collapsed');
-          body.style.maxHeight = body.scrollHeight + 'px';
-          body.classList.remove('collapsed');
-        } else {
-          body.style.maxHeight = '0';
-          body.classList.add('collapsed');
-        }
-      });
+      wireCollapsible(h2, body);
     });
 
-    // ── Strong-level collapsibles (Cover Screws subheading) ────────────────
+    // ── Strong-level collapsibles (Cover Screws & Locking subheading) ───────
     bubble.querySelectorAll('strong').forEach(strong => {
-      const text = strong.textContent || '';
-      if (!COLLAPSIBLE_STRONG.some(re => re.test(text))) return;
+      if (!COLLAPSIBLE_STRONG.some(re => re.test(strong.textContent))) return;
 
-      // The strong may be inside a <p>; grab the parent block then siblings
       const anchor = strong.closest('p') || strong;
       const siblings = [];
       let node = anchor.nextSibling;
       while (node) {
-        const tag = node.tagName;
-        if (node.nodeType === 1 && (tag === 'H2' || tag === 'H3')) break;
-        // Stop at next strong subheading (another bold paragraph)
-        if (tag === 'P' && node.querySelector('strong') && !node.querySelector('strong').closest('td')) break;
+        if (node.nodeType === 1 && (node.tagName === 'H2' || node.tagName === 'H3')) break;
+        // Stop at another bold paragraph subheading (not inside a table)
+        if (node.tagName === 'P' && node.querySelector('strong') &&
+            !node.querySelector('strong').closest('td')) break;
         siblings.push(node);
         node = node.nextSibling;
       }
@@ -723,21 +724,8 @@
       body.className = 'collapsible-body';
       siblings.forEach(s => body.appendChild(s));
       anchor.after(body);
-      body.style.maxHeight = body.scrollHeight + 'px';
-      requestAnimationFrame(() => { body.classList.add('collapsed'); body.style.maxHeight = '0'; });
 
-      anchor.classList.add('collapsible-header', 'collapsed');
-      anchor.style.cursor = 'pointer';
-      anchor.addEventListener('click', () => {
-        const nowCollapsed = anchor.classList.toggle('collapsed');
-        if (!nowCollapsed) {
-          body.style.maxHeight = body.scrollHeight + 'px';
-          body.classList.remove('collapsed');
-        } else {
-          body.style.maxHeight = '0';
-          body.classList.add('collapsed');
-        }
-      });
+      wireCollapsible(anchor, body);
     });
   }
 
