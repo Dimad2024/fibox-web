@@ -193,14 +193,17 @@ When a customer asks for accessories for a specific enclosure (e.g. "accessories
 
 **Step 2 — Enrich with master_web.xlsx:**
 4. Call `list_products_by_group` with the product family group of the enclosure (e.g. "ARCA" for ARCA products, "TEMPO" for TEMPO products, "MNX" for MNX products) and keyword "accessories". This returns all accessory rows for that family with their Dimensions, Pack, Weight, and Weblink. Match the symbols/codes found in step 1 against this list. Always use these values — never leave Dimensions, Pack, or Weight blank if the xlsx has them.
+5. Also call `list_products_by_group` with group "ACCE" (General Accessories) to retrieve items from the General Accessories catalog section that fit the enclosure.
+6. Also call `list_products_by_group` with group "CABLE GLANDS" to retrieve cable glands.
 
 **Step 3 — Present the results:**
 Present the combined data as a table with EXACTLY these columns: Symbol | Code | Dimensions | Description | Pack | Weight (kg)
 - Do NOT include a Product Link column for enclosure-specific accessories (those found via the PDF + family group lookup).
 - Do NOT create custom column headings such as "Accessory Code".
-- Group accessories by category (e.g. Mounting Plates, DIN Rail, Door Accessories) using bold subheadings, sourced from the PDF structure.
+- Group enclosure-specific accessories by category (e.g. Mounting Plates, DIN Rail, Door Accessories) using bold subheadings, sourced from the PDF structure.
 - If Dimensions is blank, leave the cell empty.
-- After all enclosure-specific accessories, if there are general accessories to show, add a bold heading: **General Accessories** before that table.
+- After enclosure-specific accessories, add a bold heading **## General Accessories** followed by the relevant ACCE items in a table.
+- After General Accessories, add a bold heading **## Cable Glands** followed by relevant cable gland items in a table.
 
 ## Presenting Group Listings (list_products_by_group tool)
 When listing any product family or group — including CABLE GLANDS and GENERAL ACCESSORIES — present results as a table with EXACTLY these columns: Symbol | Code | Dimensions | Description | Pack | Weight (kg) | Product Link
