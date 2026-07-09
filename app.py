@@ -126,6 +126,7 @@ SEARCH_PY   = os.path.join(SCRIPTS_DIR, "search_enclosures.py")
 SCRAPE_PY   = os.path.join(SCRIPTS_DIR, "scrape_fibox.py")
 LIST_PY     = os.path.join(SCRIPTS_DIR, "list_by_group.py")
 LOOKUP_PY   = os.path.join(SCRIPTS_DIR, "lookup_by_code.py")
+SYMBOL_PY   = os.path.join(SCRIPTS_DIR, "lookup_by_symbol.py")
 CONTACTS_PY = os.path.join(SCRIPTS_DIR, "contacts_lookup.py")
 
 SYSTEM_PROMPT = """You are a Fibox product specialist assistant. Help customers find the right Fibox enclosure.
@@ -149,7 +150,7 @@ Convert cm to mm if the customer uses centimetres (multiply by 10).
 
 ## Tool Selection Rules
 - Customer gives dimensions (e.g. 300x250x150) -> use search_enclosures. IMPORTANT: only treat input as dimensions if it contains THREE numeric values separated by x/× or similar. A 4-digit number like "2828" is NOT a dimension — it is a size code.
-- Customer mentions a product symbol or size code (e.g. "PC 2828", "EK 9 12", "ARCA 302015", "MNX 21 21 09") -> use list_products_by_group with the appropriate group name (SOLID for PC/ABS/GRP codes, ARCA for ARCA codes, MNX for MNX codes, etc.) to find matching products. Do NOT interpret size codes as dimensions.
+- Customer mentions a product symbol or size code (e.g. "PC 2828", "EK 9 12", "ARCA 302015", "MNX 21 21 09") -> use lookup_by_symbol with that symbol to find matching products directly from the master table. Do NOT interpret size codes as dimensions.
 - Customer asks to see a product range/family (e.g. "show ARCA range", "list MNX products") -> use list_products_by_group
 - Customer asks about features/specs of a specific product -> use scrape_product
 - Customer asks where to buy, who to contact, or how to reach Fibox in a country -> use get_contacts
@@ -384,6 +385,20 @@ TOOLS = [
             },
             "required": ["filename"]
         }
+    },
+    {
+        "name": "lookup_by_symbol",
+        "description": "Look up Fibox products by symbol or size code (e.g. 'PC 2828', 'ARCA 302015', 'MNX 21 21 09'). Use when the customer mentions a product symbol or abbreviated size code. Performs partial match — 'PC 2828' will find all PC 2828 variants.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "symbol": {
+                    "type": "string",
+                    "description": "Product symbol or size code, e.g. 'PC 2828', 'ARCA 302015', 'EK 9 12'"
+                }
+            },
+            "required": ["symbol"]
+        }
     }
 ]
 
@@ -423,6 +438,8 @@ def execute_tool(name, inputs):
         return run_script([READ_DOC_PY, "list"])
     elif name == "read_product_doc":
         return run_script([READ_DOC_PY, "read", inputs["filename"]])
+    elif name == "lookup_by_symbol":
+        return run_script([SYMBOL_PY] + inputs["symbol"].split())
     return {"error": "Unknown tool: " + name}
 
 
